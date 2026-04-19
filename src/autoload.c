@@ -35,18 +35,31 @@ void* nm_autoload_worker(void* arg) {
 
     struct stat st;
     int has_config = (stat(AUTOLOAD_CONFIG_PATH, &st) == 0);
+    
+    int enabled = 0;
+    FILE *ef = fopen(NEXT_CONFIG_PATH, "r");
+    if (ef) {
+        char line[128];
+        while (fgets(line, sizeof(line), ef)) {
+            if (strncmp(line, "AUTOLOAD_ENABLED=", 17) == 0) {
+                char *val = line + 17;
+                enabled = (atoi(val) == 1 || strncmp(val, "true", 4) == 0);
+            }
+        }
+        fclose(ef);
+    }
 
     if (!nm_server_is_active()) {
         char ip[64];
         if (nm_get_local_ip(ip, sizeof(ip)) != 0) strcpy(ip, "0.0.0.0");
         nm_notify("Next Menu Running\nhttp://%s:%d", ip, MENU_PORT);
         
-        if (has_config) {
+        if (enabled && has_config) {
             nm_notify("Autoloading in 5s\nPress PS Button to Abort");
         }
     }
 
-    if (!has_config) return NULL;
+    if (!enabled || !has_config) return NULL;
 
     int klog_fd = open("/dev/klog", O_RDONLY | O_NONBLOCK);
     if (klog_fd >= 0) {

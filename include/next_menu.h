@@ -23,6 +23,7 @@
 
 #define MENU_VERSION "1.0.2-native"
 #define AUTOLOAD_CONFIG_PATH "/data/next_menu/autoload.txt"
+#define NEXT_CONFIG_PATH "/data/next_menu/next_config.txt"
 
 /* Logging */
 void nm_log(const char *fmt, ...);

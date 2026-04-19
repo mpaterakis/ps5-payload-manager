@@ -181,43 +181,45 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
                     }
                 }
 
-                if (enabled == 1) {
-                    char *list_start = strstr(status->data, "\"AUTOLOAD_LIST\"");
-                    if (list_start) {
-                        char *val = strchr(list_start, ':');
-                        if (val) {
-                            val++;
-                            while (*val == ' ' || *val == '\"') val++;
-                            char *list_val = val;
-                            char *list_end = strchr(list_val, '\"');
-                            if (list_end) {
-                                *list_end = '\0';
-                                
-                                /* Ensure directory exists */
-                                mkdir(BASE_DATA_DIR, 0777);
-
-                                FILE *f = fopen(AUTOLOAD_CONFIG_PATH, "w");
-                                if (f) {
-                                    char *token = strtok(list_val, ",");
-                                    while (token) {
-                                        fprintf(f, "%s\n", token);
-                                        token = strtok(NULL, ",");
-                                    }
-                                    fclose(f);
-                                    nm_log("[NextMenu] Saved autoload config to %s\n", AUTOLOAD_CONFIG_PATH);
-                                } else {
-                                    nm_log("[NextMenu] !!! Failed to open %s for writing\n", AUTOLOAD_CONFIG_PATH);
-                                }
-                            }
-                        }
+                if (enabled != -1) {
+                    mkdir(BASE_DATA_DIR, 0777);
+                    FILE *ef = fopen(NEXT_CONFIG_PATH, "w");
+                    if (ef) {
+                        fprintf(ef, "AUTOLOAD_ENABLED=%d\n", enabled);
+                        fclose(ef);
+                        nm_log("[NextMenu] Saved config to %s\n", NEXT_CONFIG_PATH);
                     }
-                } else if (enabled == 0) {
-                    nm_log("[NextMenu] Disabling autoload...\n");
-                    nm_autoload_abort(); /* Stop any active countdown */
-                    if (unlink(AUTOLOAD_CONFIG_PATH) == 0) {
-                        nm_log("[NextMenu] Deleted autoload config file.\n");
-                    } else {
-                        nm_log("[NextMenu] Autoload config already gone or delete failed.\n");
+                    if (enabled == 0) nm_autoload_abort();
+                }
+
+                char *list_start = strstr(status->data, "\"AUTOLOAD_LIST\"");
+                if (list_start) {
+                    char *val = strchr(list_start, ':');
+                    if (val) {
+                        val++;
+                        while (*val == ' ' || *val == '\"') val++;
+                        
+                        /* Find the end of the string value */
+                        char *list_end = strchr(val, '\"');
+                        size_t list_len = list_end ? (size_t)(list_end - val) : 0;
+                        char *list_val = malloc(list_len + 1);
+                        if (list_val) {
+                            memcpy(list_val, val, list_len);
+                            list_val[list_len] = '\0';
+                            
+                            mkdir(BASE_DATA_DIR, 0777);
+                            FILE *f = fopen(AUTOLOAD_CONFIG_PATH, "w");
+                            if (f) {
+                                char *token = strtok(list_val, ",");
+                                while (token) {
+                                    fprintf(f, "%s\n", token);
+                                    token = strtok(NULL, ",");
+                                }
+                                fclose(f);
+                                nm_log("[NextMenu] Saved autoload list to %s\n", AUTOLOAD_CONFIG_PATH);
+                            }
+                            free(list_val);
+                        }
                     }
                 }
             }
@@ -388,29 +390,37 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
         resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
         MHD_add_response_header(resp, "Content-Type", "application/json");
     } else if (strcmp(url, ROUTE_GET_CONFIG) == 0) {
-        /* Check if autoload file exists to report status */
-        struct stat st;
-        int has_autoload = (stat(AUTOLOAD_CONFIG_PATH, &st) == 0);
-        char list_buf[4096] = {0};
-        
-        if (has_autoload) {
-            FILE *f = fopen(AUTOLOAD_CONFIG_PATH, "r");
-            if (f) {
-                char line[256];
-                int first = 1;
-                while (fgets(line, sizeof(line), f)) {
-                    line[strcspn(line, "\r\n")] = 0;
-                    if (strlen(line) == 0) continue;
-                    if (!first) strncat(list_buf, ",", sizeof(list_buf) - strlen(list_buf) - 1);
-                    strncat(list_buf, line, sizeof(list_buf) - strlen(list_buf) - 1);
-                    first = 0;
+        /* Check if enabled */
+        int enabled = 0;
+        FILE *ef = fopen(NEXT_CONFIG_PATH, "r");
+        if (ef) {
+            char line[128];
+            while (fgets(line, sizeof(line), ef)) {
+                if (strncmp(line, "AUTOLOAD_ENABLED=", 17) == 0) {
+                    enabled = atoi(line + 17);
                 }
-                fclose(f);
             }
+            fclose(ef);
+        }
+
+        /* Get list */
+        char list_buf[4096] = {0};
+        FILE *f = fopen(AUTOLOAD_CONFIG_PATH, "r");
+        if (f) {
+            char line[256];
+            int first = 1;
+            while (fgets(line, sizeof(line), f)) {
+                line[strcspn(line, "\r\n")] = 0;
+                if (strlen(line) == 0) continue;
+                if (!first) strncat(list_buf, ",", sizeof(list_buf) - strlen(list_buf) - 1);
+                strncat(list_buf, line, sizeof(list_buf) - strlen(list_buf) - 1);
+                first = 0;
+            }
+            fclose(f);
         }
 
         snprintf(response_buffer, sizeof(response_buffer), "{\"AUTOLOAD_ENABLED\":%s,\"AUTOLOAD_LIST\":\"%s\"}", 
-                has_autoload ? "true" : "false", list_buf);
+                enabled ? "true" : "false", list_buf);
         resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
         MHD_add_response_header(resp, "Content-Type", "application/json");
     } else {
