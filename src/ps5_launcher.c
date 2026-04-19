@@ -10,6 +10,8 @@
 #include "next_menu.h"
 #include "ps5_launcher.h"
 
+#include <stdint.h>
+
 int ps5_launch_elf(const char* path) {
     nm_log("[NextMenu] Sending ELF to local loader: %s\n", path);
 

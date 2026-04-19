@@ -25,7 +25,9 @@ import {
   Zap,
   ChevronUp,
   ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
@@ -142,6 +144,125 @@ const PayloadCard = ({ path, idx, loading, onLoad, onDelete, showPath = true, sh
           <Trash2 className="w-5 h-5" />
         </button>
       )}
+    </div>
+  )
+}
+
+const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
+  const isCountdown = status.remaining > 0;
+  const isExecuting = status.remaining === 0 && status.current !== 'DONE';
+  const isDone = status.current === 'DONE';
+  const payloadList = status.list ? status.list.split(',') : [];
+
+  return (
+    <div className="fixed inset-0 bg-black/98 z-[9999] flex flex-col items-center justify-center p-8">
+      <div className="relative text-center space-y-10 max-w-2xl w-full">
+        <div className="space-y-4">
+          <h1 className="text-6xl font-black text-white uppercase italic tracking-tighter">
+            Next <span className="text-ps-blue">Menu</span>
+          </h1>
+          <p className="text-ps-blue font-black tracking-[0.4em] uppercase text-lg">
+            {isCountdown ? "Autoloading Sequence" : isExecuting ? "Executing Payloads" : "Sequence Complete"}
+          </p>
+        </div>
+
+        {isCountdown && (
+          <div className="relative h-64 w-64 mx-auto flex items-center justify-center">
+            <svg className="absolute inset-0 w-full h-full -rotate-90">
+                <circle
+                    cx="128" cy="128" r="110"
+                    fill="none" stroke="currentColor" strokeWidth="8"
+                    className="text-white/5"
+                />
+                <circle
+                    cx="128" cy="128" r="110"
+                    fill="none" stroke="currentColor" strokeWidth="8"
+                    strokeDasharray="691"
+                    strokeDashoffset={691 - (691 * (status.remaining / 5))}
+                    className="text-ps-blue transition-all duration-1000 ease-linear"
+                />
+            </svg>
+            <span className="text-[100px] font-black text-white tabular-nums leading-none">
+                {status.remaining}
+            </span>
+          </div>
+        )}
+
+        {isExecuting && (
+          <div className="w-full space-y-4 max-h-[450px] overflow-y-auto custom-scrollbar p-6 bg-white/5 rounded-3xl border border-white/10">
+              <div className="flex items-center justify-between mb-4 px-2">
+                  <h3 className="label-caps !text-zinc-500">Payload Checklist</h3>
+                  <span className="text-zinc-400 font-bold">{status.done} / {status.total}</span>
+              </div>
+              
+              <div className="space-y-2">
+                  {payloadList.map((name, i) => {
+                      const active = i === status.done;
+                      const done = i < status.done;
+                      return (
+                          <div key={i} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                              active ? 'bg-ps-blue/20 border-ps-blue' : 
+                              done ? 'bg-ps-blue/5 border-ps-blue/20 opacity-80' : 'bg-white/5 border-white/10 opacity-40'
+                          }`}>
+                              <div className="flex items-center space-x-4">
+                                  {done ? <CheckCircle2 className="w-5 h-5 text-ps-blue" /> : 
+                                   active ? <Loader2 className="w-5 h-5 text-ps-blue animate-spin" /> : 
+                                   <div className="w-5 h-5 rounded-full border-2 border-white/20" />}
+                                  <span className={`font-bold uppercase tracking-tight ${active ? 'text-white' : 'text-zinc-300'}`}>
+                                      {name.split('/').pop().replace('.elf', '').replace(/_/g, ' ')}
+                                  </span>
+                              </div>
+                              {done && (
+                                  <span className="px-3 py-1 bg-ps-blue text-white text-[10px] font-black uppercase tracking-widest rounded-full">
+                                      Ready
+                                  </span>
+                              )}
+                          </div>
+                      )
+                  })}
+              </div>
+          </div>
+        )}
+
+        {isDone && (
+            <div className="space-y-12 py-10">
+                <div className="relative mx-auto w-48 h-48 flex items-center justify-center">
+                    <div className="relative bg-ps-blue text-white p-10 rounded-full">
+                        <CheckCircle2 className="w-24 h-24" />
+                    </div>
+                </div>
+                <div className="space-y-6">
+                    <h2 className="text-5xl font-black text-white uppercase tracking-tighter">
+                        Loaded {status.total} Payloads
+                    </h2>
+                    <p className="text-3xl text-zinc-400 font-bold uppercase tracking-widest">
+                        You can safely close this menu now.
+                    </p>
+                </div>
+            </div>
+        )}
+
+        <div className="pt-4 w-full">
+            {isDone && (
+                <button 
+                    onClick={onFinish}
+                    className="w-full py-8 bg-white text-black text-3xl font-black uppercase rounded-3xl hover:bg-ps-blue hover:text-white transition-all transform active:scale-95 shadow-2xl"
+                >
+                    Back to Dashboard
+                </button>
+            )}
+            
+            {isCountdown && (
+                <button 
+                    onClick={onCancel}
+                    autoFocus
+                    className="w-full py-8 bg-white text-black text-3xl font-black uppercase rounded-3xl hover:bg-red-500 hover:text-white transition-all transform active:scale-95"
+                >
+                    Abort
+                </button>
+            )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -518,7 +639,10 @@ const AutoloadView = ({ payloads, config, onSaveConfig }) => {
            </p>
         </div>
         <button 
-          onClick={() => { setEnabled(true); }}
+          onClick={() => { 
+            setEnabled(true); 
+            onSaveConfig({ AUTOLOAD_ENABLED: true, AUTOLOAD_LIST: autoloadList.join(',') });
+          }}
           className="px-12 py-5 bg-ps-blue hover:bg-ps-blue/80 text-white rounded-2xl font-black text-xl shadow-2xl transition-all"
         >
           Enable Autoload
@@ -535,7 +659,11 @@ const AutoloadView = ({ payloads, config, onSaveConfig }) => {
         </h2>
         <div className="flex items-center space-x-4">
           <button 
-            onClick={() => { setEnabled(false); setAutoloadList([]); }}
+            onClick={() => { 
+                setEnabled(false); 
+                setAutoloadList([]); 
+                onSaveConfig({ AUTOLOAD_ENABLED: false, AUTOLOAD_LIST: "" });
+            }}
             className="px-6 py-3 bg-red-950/30 text-red-500 font-bold rounded-xl border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
           >
             Disable
@@ -712,7 +840,8 @@ const InfoView = ({ version }) => (
 )
 
 function App() {
-  const [view, setView] = useState('dashboard') // dashboard, payloads, manage, autoload, logs, settings
+  const [view, setView] = useState('dashboard')
+  const [autoloadStatus, setAutoloadStatus] = useState(null)
   const [logs, setLogs] = useState([])
   const [payloads, setPayloads] = useState([])
   const [remotePayloads, setRemotePayloads] = useState([])
@@ -734,16 +863,21 @@ function App() {
       if (options.method === 'POST') return response.text()
       try {
         const text = await response.text()
-        // Prevent parsing HTML as JSON (Vite dev server fallback)
         if (text.trim().startsWith('<!DOCTYPE')) return null
         return JSON.parse(text)
-      } catch (e) {
-        return null 
-      }
-    } catch (e) {
-      console.error(`API Error (${endpoint}):`, e)
-      return null
-    }
+      } catch (e) { return null }
+    } catch (e) { return null }
+  }
+
+  const handleAbort = async () => {
+    await fetch('/abort').catch(() => {})
+    setAutoloadStatus(prev => prev ? { ...prev, remaining: -1 } : null)
+  }
+
+  const handleFinish = async () => {
+    await fetch('/autoload_clear').catch(() => {})
+    setAutoloadStatus(null)
+    window.location.reload()
   }
 
   const refreshPayloads = async () => {
@@ -760,14 +894,11 @@ function App() {
     const init = async () => {
       const ipData = await fetch('/getip').then(r => r.text()).catch(() => '0.0.0.0')
       setIp(ipData.includes('<!DOCTYPE') ? '192.168.1.133' : ipData)
-      
       const verData = await fetch('/version').then(r => r.text()).catch(() => '?')
       setVersion(verData.includes('<!DOCTYPE') ? '1.0.0-dev' : verData)
-
       refreshPayloads()
       refreshConfig()
-
-      // Fetch remote payloads
+      
       try {
         const res = await fetch(PAYLOAD_EXPLORER_URL)
         const data = await res.json()
@@ -776,12 +907,20 @@ function App() {
     }
     init()
 
+    const statusInterval = setInterval(async () => {
+      const status = await api('/autoload_status')
+      if (status) setAutoloadStatus(status)
+    }, 1000)
+
     const logInterval = setInterval(async () => {
       const logData = await api('/log')
       if (logData?.logs) setLogs(logData.logs)
     }, 1500)
 
-    return () => { clearInterval(logInterval); }
+    return () => { 
+      clearInterval(statusInterval)
+      clearInterval(logInterval)
+    }
   }, [])
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'auto' }) }, [logs])
@@ -881,6 +1020,14 @@ function App() {
            </button>
         </div>
       </nav>
+      
+      {autoloadStatus && autoloadStatus.remaining >= 0 && (
+        <AutoloadOverlay 
+            status={autoloadStatus} 
+            onCancel={handleAbort} 
+            onFinish={handleFinish}
+        />
+      )}
 
       {/* Main Content Space */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#0a0a0c]">

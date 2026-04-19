@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #include "next_menu.h"
 #include "autoload.h"
@@ -11,74 +12,134 @@
 #include "ps5_launcher.h"
 
 static volatile int abort_flag = 0;
+static volatile int remaining_seconds = -1;
 static pthread_t autoload_thread;
 
+static char autoload_current_name[128] = "";
+static int autoload_total_count = 0;
+static int autoload_done_count = 0;
+
+int nm_autoload_get_remaining_seconds() {
+    return remaining_seconds;
+}
+
+void nm_autoload_get_status(int *total, int *done, char *current) {
+    *total = autoload_total_count;
+    *done = autoload_done_count;
+    if (current) strcpy(current, autoload_current_name);
+}
+
 void* nm_autoload_worker(void* arg) {
-    nm_log("[Autoload] Checking for %s...\n", AUTOLOAD_CONFIG_PATH);
-    
+    /* Wait 500ms to see if browser opens the menu automatically */
+    usleep(500000);
+
     struct stat st;
-    if (stat(AUTOLOAD_CONFIG_PATH, &st) != 0) {
-        /* Silently skip if no config exists */
-        return NULL;
-    }
+    int has_config = (stat(AUTOLOAD_CONFIG_PATH, &st) == 0);
 
-    nm_log("[Autoload] Config found. Starting 10s countdown...\n");
-    nm_notify("Autoload in 10s...\nVisit /abort to cancel");
-
-    for (int i = 10; i > 0; i--) {
-        if (abort_flag) {
-            nm_log("[Autoload] ABORTED by user during countdown.\n");
-            nm_notify("Autoload Cancelled");
-            return NULL;
+    if (!nm_server_is_active()) {
+        char ip[64];
+        if (nm_get_local_ip(ip, sizeof(ip)) != 0) strcpy(ip, "0.0.0.0");
+        nm_notify("Next Menu Running\nhttp://%s:%d", ip, MENU_PORT);
+        
+        if (has_config) {
+            nm_notify("Autoloading in 5s\nPress PS Button to Abort");
         }
-        sleep(1);
     }
 
+    if (!has_config) return NULL;
+
+    int klog_fd = open("/dev/klog", O_RDONLY | O_NONBLOCK);
+    if (klog_fd >= 0) {
+        /* Flush existing log buffer so we only catch NEW button presses */
+        char flush_buf[4096];
+        while (read(klog_fd, flush_buf, sizeof(flush_buf)) > 0);
+        nm_log("[Autoload] klog buffer flushed.\n");
+    } else {
+        nm_log("[Autoload] !!! Failed to open /dev/klog for input monitoring.\n");
+    }
+
+    nm_log("[Autoload] Config found. Starting 5s countdown (Press PS Button to Abort)...\n");
+    
+    char klog_buf[2048];
+    for (int i = 5; i > 0; i--) {
+        remaining_seconds = i;
+        nm_log("[Autoload] Countdown: %ds remaining...\n", i);
+        
+        for (int j = 0; j < 10; j++) {
+            if (abort_flag) {
+                nm_log("[Autoload] ABORTED via API.\n");
+                if (klog_fd >= 0) close(klog_fd);
+                remaining_seconds = -1;
+                return NULL;
+            }
+
+            if (klog_fd >= 0) {
+                ssize_t n = read(klog_fd, klog_buf, sizeof(klog_buf) - 1);
+                if (n > 0) {
+                    klog_buf[n] = 0;
+                    if (strstr(klog_buf, "onPSButtonPressed")) {
+                        nm_log("[Autoload] ABORTED via PS Button.\n");
+                        nm_notify("Autoload Aborted");
+                        abort_flag = 1;
+                        close(klog_fd);
+                        remaining_seconds = -1;
+                        return NULL;
+                    }
+                }
+            }
+            usleep(100000); /* 100ms */
+        }
+    }
+
+    if (klog_fd >= 0) close(klog_fd);
+    remaining_seconds = 0;
+    
     FILE *f = fopen(AUTOLOAD_CONFIG_PATH, "r");
     if (!f) {
         nm_log("[Autoload] !!! Failed to open %s\n", AUTOLOAD_CONFIG_PATH);
+        remaining_seconds = -1;
         return NULL;
     }
 
     nm_log("[Autoload] Starting sequence...\n");
-    nm_notify("Autoload: Starting sequence");
-
+    
+    /* Count total first for UI */
+    autoload_total_count = 0;
+    autoload_done_count = 0;
+    char count_line[256];
+    while (fgets(count_line, sizeof(count_line), f)) {
+        if (count_line[0] != '!' && strlen(count_line) > 1) autoload_total_count++;
+    }
+    rewind(f);
+    
     char line[256];
     while (fgets(line, sizeof(line), f)) {
         if (abort_flag) {
-            nm_log("[Autoload] ABORTED by user during execution.\n");
-            nm_notify("Autoload Aborted");
+            nm_log("[Autoload] ABORTED during execution.\n");
             break;
         }
 
-        /* Strip newline characters */
         line[strcspn(line, "\r\n")] = 0;
-        
-        /* Skip empty lines or comments if we wanted them, but user specified format */
         if (strlen(line) == 0) continue;
 
         if (line[0] == '!') {
-            /* Delay command: !2000 means 2000ms */
             int delay = atoi(line + 1);
             if (delay > 0) {
                 nm_log("[Autoload] Delaying for %d ms...\n", delay);
-                /* usleep takes microseconds */
-                usleep(delay * 1000);
+                /* Sleep in 100ms chunks to check for abort_flag */
+                for (int d = 0; d < delay; d += 100) {
+                    if (abort_flag) break;
+                    usleep(100000);
+                }
             }
         } else {
-            /* Payload command: search for the ELF in scan directories */
             char full_path[512];
             if (payload_mgr_resolve_path(line, full_path, sizeof(full_path)) == 0) {
+                strncpy(autoload_current_name, line, sizeof(autoload_current_name) - 1);
                 nm_log("[Autoload] Launching: %s\n", full_path);
-                nm_notify("Autoload: Launching %s", line);
-                
-                /* Give a small delay before launch so notification can be seen */
-                usleep(500000); 
-                
                 ps5_launch_elf(full_path);
-                
-                /* Give a small delay after launch to ensure elfldr handles it */
-                sleep(1);
+                autoload_done_count++;
+                usleep(500000); /* UI visibility */
             } else {
                 nm_log("[Autoload] !!! Payload not found: %s\n", line);
             }
@@ -87,6 +148,8 @@ void* nm_autoload_worker(void* arg) {
 
     fclose(f);
     nm_log("[Autoload] Sequence complete.\n");
+    strcpy(autoload_current_name, "DONE");
+    remaining_seconds = 0;
     return NULL;
 }
 
@@ -102,4 +165,11 @@ int nm_autoload_start() {
 
 void nm_autoload_abort() {
     abort_flag = 1;
+}
+
+void nm_autoload_reset() {
+    remaining_seconds = -1;
+    autoload_total_count = 0;
+    autoload_done_count = 0;
+    strcpy(autoload_current_name, "");
 }
