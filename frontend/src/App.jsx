@@ -1075,7 +1075,7 @@ function App() {
       if (options.method === 'POST') return response.text()
       try {
         const text = await response.text()
-        if (text.trim().startsWith('<!DOCTYPE')) return null
+        if (text.toLowerCase().includes('<!doctype')) return null
         return JSON.parse(text)
       } catch (e) { return null }
     } catch (e) { return null }
@@ -1199,9 +1199,9 @@ function App() {
   useEffect(() => {
     const init = async () => {
       const ipRes = await fetch('/getip').then(r => r.text()).catch(() => '0.0.0.0')
-      setIp(ipRes.includes('<!DOCTYPE') ? '192.168.1.133' : ipRes)
+      setIp(ipRes.toLowerCase().includes('<!doctype') ? '192.168.1.133' : ipRes)
       const verRes = await fetch('/version').then(r => r.text()).catch(() => '?')
-      setVersion(verRes.includes('<!DOCTYPE') ? '1.0.0-dev' : verRes)
+      setVersion(verRes.toLowerCase().includes('<!doctype') ? '1.0.0-dev' : verRes)
       refreshPayloads()
       refreshConfig()
     }
