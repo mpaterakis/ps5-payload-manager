@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
-  Play,
   Settings,
   Terminal,
   CloudDownload,
@@ -64,15 +63,20 @@ const parsePayloadName = (path) => {
   };
 };
 
-const PayloadName = ({ path, className, versionClassName }) => {
+const PayloadName = ({ path, className, versionClassName, stacked = false }) => {
   const { displayName, version, isDelay } = parsePayloadName(path);
   return (
-    <div className={cn("flex items-center space-x-2 min-w-0 flex-1", className)}>
-      {isDelay && <Zap className="w-4 h-4 text-ps-blue shrink-0" />}
-      <span className="font-bold truncate shrink">{displayName}</span>
+    <div className={cn("flex min-w-0 flex-1", stacked ? "flex-col items-start" : "items-center space-x-3", className)}>
+      <div className="flex items-center space-x-2 min-w-0">
+        {isDelay && <Zap className="w-4 h-4 text-ps-blue shrink-0" />}
+        <span className="font-extrabold truncate shrink leading-tight">{displayName}</span>
+      </div>
       {version && (
         <span className={cn(
-          "text-[9px] px-1 py-0.5 rounded-md font-black uppercase tracking-tighter border border-white/10 bg-white/5 text-ps-blue shrink-0", "px-2 py-0.5 bg-white/10 text-ps-blue text-[10px] font-black uppercase rounded-md border border-white/5", versionClassName)}>
+          stacked 
+            ? "text-[11px] font-bold tracking-wider text-ps-blue mt-1 opacity-90" 
+            : "text-[10px] px-2 py-0.5 bg-ps-blue/10 text-ps-blue font-bold rounded-md border border-ps-blue/20 shrink-0", 
+          versionClassName)}>
           {version}
         </span>
       )}
@@ -151,12 +155,12 @@ const NavButton = ({ active, onClick, icon: Icon, label, mobileLabel, className,
       >
         <Icon className={cn(
           "w-6 h-6 shrink-0 group-hover:scale-110 transition-transform",
-          active ? (sidebar ? "text-white" : (isDonate ? "text-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]" : "text-ps-blue shadow-[0_0_10px_rgba(0,149,255,0.5)]")) : (isDonate ? "text-red-500" : "")
+          active ? (sidebar ? "text-current" : (isDonate ? "text-red-500" : "text-ps-blue")) : (isDonate ? "text-red-500" : "")
         )} />
         <span className={cn(
           "uppercase tracking-tighter transition-all duration-300 whitespace-nowrap overflow-hidden",
           sidebar
-            ? (sidebarExpanded ? "opacity-100 w-auto font-black italic text-sm" : "opacity-0 w-0")
+            ? (sidebarExpanded ? "opacity-100 w-auto font-bold text-sm" : "opacity-0 w-0")
             : (isPS5 ? "text-sm font-bold" : "text-[10px] md:text-sm")
         )}>
           <span className={cn((isPS5 || sidebar) ? "inline" : "hidden md:inline")}>{label}</span>
@@ -168,23 +172,17 @@ const NavButton = ({ active, onClick, icon: Icon, label, mobileLabel, className,
 }
 
 const PayloadButton = ({ path, onClick, isLoading }) => {
-  const name = path.split('/').pop().replace(/\.(elf|bin|lua)$/i, '').replace(/_/g, ' ')
   return (
     <button
       onClick={onClick}
       disabled={isLoading}
-      className="group glass-card p-6 rounded-ps-xl flex items-center border border-white/5 hover:border-ps-blue hover:bg-ps-blue/5 transition-all text-left relative"
+      className="group glass-card p-6 rounded-ps-xl flex flex-col border border-white/5 hover:border-ps-blue hover:bg-ps-blue/5 transition-all text-left relative overflow-hidden"
     >
-      <div className="flex items-center space-x-4 z-10">
-        <div className={cn(
-          "p-3 rounded-xl transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]",
-          isLoading ? "bg-ps-blue text-white" : "bg-white/5 group-hover:bg-ps-blue group-hover:text-white"
-        )}>
-          {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6" />}
-        </div>
-        <PayloadName path={path} className="text-white text-lg" />
+      <div className="flex items-start justify-between w-full z-10">
+        <PayloadName path={path} className="text-white text-xl" stacked />
+        {isLoading && <Loader2 className="w-6 h-6 animate-spin text-ps-blue shrink-0" />}
       </div>
-      {/* Glow that doesn't clip - relative and z-0 */}
+      {/* Glow effect */}
       <div className="absolute inset-0 bg-ps-blue/0 group-hover:bg-ps-blue/5 transition-colors z-0 pointer-events-none" />
     </button>
   )
@@ -229,7 +227,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
           <div className="h-[320px] w-full flex flex-col items-center justify-center">
             {isCountdown && (
               <div className="space-y-8 animate-in fade-in zoom-in duration-300 text-center">
-                <p className="text-ps-blue font-black tracking-[0.4em] uppercase text-xl">Autoloading</p>
+                <p className="text-ps-blue font-extrabold tracking-[0.2em] uppercase text-xl">Autoloading</p>
                 <div className="relative h-56 w-56 mx-auto flex items-center justify-center">
                   <svg className="absolute inset-0 w-full h-full -rotate-90 scale-110">
                     <circle cx="112" cy="112" r="100" fill="none" stroke="currentColor" strokeWidth="8" className="text-white/5" />
@@ -241,7 +239,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
                       className="text-ps-blue transition-all duration-1000 ease-linear"
                     />
                   </svg>
-                  <span className="text-8xl font-black text-white tabular-nums leading-none">
+                  <span className="text-8xl font-bold text-white tabular-nums leading-none">
                     {status.remaining}
                   </span>
                 </div>
@@ -289,7 +287,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
             {isDone ? (
               <button
                 onClick={onFinish}
-                className="w-full py-8 bg-ps-blue text-white text-3xl font-black uppercase rounded-3xl hover:bg-white hover:text-ps-blue transition-all transform active:scale-95 shadow-[0_0_50px_rgba(0,149,255,0.3)]"
+                className="w-full py-8 bg-ps-blue text-white text-3xl font-extrabold rounded-3xl hover:bg-white hover:text-ps-blue transition-all transform active:scale-95 shadow-[0_0_50px_rgba(0,149,255,0.3)]"
               >
                 Return to Dashboard
               </button>
@@ -370,7 +368,6 @@ const AutoloadOverlay = ({ status, onCancel, onFinish }) => {
 }
 
 const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
-  const [subView, setSubView] = useState('menu')
   const [remotePayloads, setRemotePayloads] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -391,10 +388,8 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
   }
 
   useEffect(() => {
-    if (subView === 'repo' && remotePayloads.length === 0) {
-      fetchRemote()
-    }
-  }, [subView])
+    fetchRemote()
+  }, [])
 
   const localFilenames = useMemo(() => payloads.map(p => p.split('/').pop()), [payloads])
   const internalPayloads = payloads.filter(p => !p.includes('/mnt/usb'))
@@ -418,187 +413,159 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload }) => {
     }).sort((a, b) => {
       if (a.isUpdate && !b.isUpdate) return -1
       if (!a.isUpdate && b.isUpdate) return 1
-      if (a.isInstalled && !b.isInstalled) return 1
-      if (!a.isInstalled && b.isInstalled) return -1
       return 0
     })
   }, [remotePayloads, localFilenames])
 
-  const updateCount = useMemo(() => {
-    if (!Array.isArray(remotePayloads) || remotePayloads.length === 0) return 0;
-    return remotePayloads.filter(p => {
-      const isInstalled = p.filename ? localFilenames.includes(p.filename) : false
-      const baseName = getBaseName(p.filename)
-      const installedVersion = localFilenames.find(f => getBaseName(f) === baseName)
-      return !isInstalled && !!installedVersion
-    }).length
-  }, [remotePayloads, localFilenames])
-
-  if (subView === 'repo') {
-    return (
-      <div className="flex flex-col h-full space-y-8 animate-fade-in">
-        <div className="flex items-center space-x-6 shrink-0 px-6">
-          <button onClick={() => setSubView('menu')} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
-            Cloud <span className="text-ps-blue">Repository</span>
-          </h2>
-        </div>
-
-        {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center space-y-6">
-            <Loader2 className="w-16 h-16 text-ps-blue animate-spin" />
-            <p className="label-caps animate-pulse">Connecting to Repository...</p>
-          </div>
-        ) : error ? (
-          <div className="flex-1 flex flex-col items-center justify-center space-y-6 text-center">
-            <AlertTriangle className="w-16 h-16 text-red-500" />
-            <div className="space-y-2">
-              <p className="text-xl font-bold text-white uppercase">Connection Failed</p>
-              <p className="text-zinc-500">Could not reach the cloud repository. Please check your internet connection.</p>
-            </div>
-            <button
-              onClick={fetchRemote}
-              className="px-8 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl font-bold uppercase transition-all"
-            >
-              Retry Connection
-            </button>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto px-6 pb-20 custom-scrollbar">
-            <div className="grid grid-cols-1 gap-6">
-              {remoteStatus.map((p, i) => (
-                <div key={i} className={cn(
-                  "glass-card p-6 rounded-ps-2xl flex items-center justify-between border-white/10 transition-all",
-                  p.isInstalled && "opacity-50 grayscale bg-black/40"
-                )}>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-4">
-                      <span className="font-bold text-white uppercase text-xl tracking-tight">{p.filename}</span>
-                      {p.isUpdate && (
-                        <span className="text-[10px] bg-emerald-500 text-white px-2 py-1 rounded font-black uppercase tracking-widest">Update Available</span>
-                      )}
-                      {p.isInstalled && (
-                        <span className="text-[10px] bg-zinc-700 text-zinc-300 px-2 py-1 rounded font-black uppercase tracking-widest">Installed</span>
-                      )}
-                    </div>
-                    <p className="text-md text-zinc-300 font-medium max-w-2xl">{p.description}</p>
-                  </div>
-
-                  {!p.isInstalled && (
-                    <button
-                      onClick={() => onInstall(p, p.installedFilename)}
-                      className={cn(
-                        "flex items-center space-x-3 px-6 py-4 rounded-xl font-bold transition-all shadow-xl",
-                        p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
-                      )}
-                    >
-                      <CloudDownload className="w-6 h-6" />
-                      <span>{p.isUpdate ? "Update" : "Install"}</span>
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  if (subView === 'remove') {
-    return (
-      <div className="space-y-8 animate-fade-in">
-        <div className="flex items-center space-x-6">
-          <button onClick={() => setSubView('menu')} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
-            Remove <span className="text-red-500">Payload</span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          {internalPayloads.map((path, i) => {
-            const fileName = path.split('/').pop()
-            return (
-              <div key={i} className="flex items-center justify-between p-6 glass-card rounded-ps-xl border-white/10 hover:bg-white/[0.02]">
-                <div>
-                  <p className="font-bold text-white uppercase text-xl tracking-tight">{fileName}</p>
-                  <p className="text-sm font-mono text-zinc-400">{path}</p>
-                </div>
-                <button
-                  onClick={() => onDelete(fileName)}
-                  className="p-4 rounded-xl bg-red-950/40 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all shadow-lg"
-                >
-                  <Trash2 className="w-6 h-6" />
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
+  const cloudItems = remoteStatus.filter(p => !p.isInstalled || p.isUpdate);
 
   return (
-    <div className="space-y-12 animate-fade-in">
-      <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
-        Payload <span className="text-ps-blue">Management</span>
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <button
-          onClick={() => setSubView('repo')}
-          className="relative glass-card p-10 rounded-ps-2xl flex flex-col items-center justify-center space-y-4 border-white/10 hover:border-ps-blue group"
-        >
-          {updateCount > 0 && (
-            <span className="absolute top-6 right-6 bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg z-10">
-              {updateCount} Update{updateCount > 1 ? 's' : ''}
-            </span>
-          )}
-          <div className="p-6 rounded-3xl bg-ps-blue/10 group-hover:bg-ps-blue group-hover:text-white transition-all">
-            <CloudDownload className="w-12 h-12" />
-          </div>
-          <span className="text-xl font-black uppercase tracking-tighter">Get Payloads from Repository</span>
-        </button>
-
-        <button
-          onClick={() => setSubView('remove')}
-          className="glass-card p-10 rounded-ps-2xl flex flex-col items-center justify-center space-y-4 border-white/10 hover:border-red-500 group"
-        >
-          <div className="p-6 rounded-3xl bg-red-500/10 group-hover:bg-red-500 group-hover:text-white transition-all">
-            <Trash2 className="w-12 h-12" />
-          </div>
-          <span className="text-xl font-black uppercase tracking-tighter">Remove Payload</span>
-        </button>
+    <div className="space-y-12 animate-fade-in pb-32">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <h2 className="text-5xl font-extrabold text-white tracking-tight">
+          Payload <span className="text-ps-blue">Management</span>
+        </h2>
+        
+        {!isPS5 && (
+          <label className="inline-flex items-center space-x-4 px-10 py-5 bg-ps-blue hover:bg-ps-blue/80 text-white rounded-[1.25rem] font-bold tracking-tight text-xl cursor-pointer transition-all shadow-2xl shadow-ps-blue/20 shrink-0 transform active:scale-95">
+            <Upload className="w-7 h-7" />
+            <span>Upload ELF Payload</span>
+            <input type="file" className="hidden" onChange={onUpload} accept=".elf,.bin,.lua" />
+          </label>
+        )}
       </div>
 
-      <div className="glass-card p-10 rounded-ps-2xl flex flex-col md:flex-row items-center space-y-8 md:space-y-0 md:space-x-12 border-white/10 bg-white/[0.02]">
-        {isPS5 && (
-          <div className="bg-white p-6 rounded-3xl shadow-2xl shrink-0">
-            <QRCodeSVG value={`http://${window.location.host}`} size={180} level="M" />
-          </div>
-        )}
-        <div className="flex-1 space-y-6 text-center md:text-left">
-          <h4 className="label-caps mb-3 text-lg">{isPS5 ? "Remote Management" : "Direct Upload"}</h4>
-          <p className="text-md text-zinc-300 leading-relaxed italic font-medium">
-            {isPS5 ? (
-              <>Scan the code or visit <code>http://{window.location.host}</code> on another device for easier management and file transfers.</>
-            ) : (
-              <>Select a payload file from your device to upload.</>
-            )}
-          </p>
-          {!isPS5 && (
-            <label className="inline-flex items-center space-x-3 px-8 py-4 bg-ps-blue hover:bg-ps-blue/80 text-white rounded-2xl font-bold cursor-pointer transition-all shadow-xl">
-              <Upload className="w-6 h-6" />
-              <span>Upload ELF Payload</span>
-              <input type="file" className="hidden" onChange={onUpload} accept=".elf,.bin,.lua" />
-            </label>
+      {/* Installed Payloads Section */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="label-caps !text-white flex items-center space-x-4 text-lg">
+            <Database className="w-6 h-6 text-ps-blue" />
+            <span>Installed Payloads</span>
+          </h3>
+          <span className="bg-white/5 px-4 py-1 rounded-full text-zinc-500 font-bold text-xs">
+            {internalPayloads.length} Files
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-1 gap-4">
+          {internalPayloads.length === 0 ? (
+            <div className="py-20 border-2 border-dashed border-white/5 rounded-ps-3xl flex flex-col items-center justify-center space-y-4 bg-white/[0.01]">
+              <Package className="w-16 h-16 text-white/5" />
+              <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm italic">Library Empty</p>
+            </div>
+          ) : (
+            internalPayloads.map((path, i) => {
+              const fileName = path.split('/').pop()
+              const remoteMatch = remoteStatus.find(rp => rp.filename === fileName || rp.installedFilename === fileName)
+              return (
+                <div key={i} className="group flex items-center justify-between p-6 glass-card rounded-ps-2xl border-white/10 hover:border-ps-blue/30">
+                  <div className="flex items-center space-x-6">
+                    <div className="p-4 bg-white/5 rounded-2xl group-hover:bg-ps-blue/10 transition-colors">
+                      <Package className="w-8 h-8 text-zinc-400 group-hover:text-ps-blue transition-colors" />
+                    </div>
+                    <div>
+                      <PayloadName path={fileName} className="text-2xl" versionClassName="text-sm px-3 py-1 bg-ps-blue/10 text-ps-blue border-ps-blue/20" />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    {remoteMatch?.isUpdate && (
+                       <button
+                        onClick={() => onInstall(remoteMatch, fileName)}
+                        className="flex items-center space-x-3 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm transition-all shadow-xl shadow-emerald-900/20"
+                      >
+                        <RefreshCw className="w-5 h-5 animate-spin-slow" />
+                        <span>Update Available</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onDelete(fileName)}
+                      className="p-4 rounded-xl bg-red-950/20 text-red-500 border border-red-500/10 hover:bg-red-500 hover:text-white transition-all shadow-xl"
+                      title="Remove Payload"
+                    >
+                      <Trash2 className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })
           )}
         </div>
-      </div>
+      </section>
+
+      {/* Cloud Repository Section */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="label-caps !text-white flex items-center space-x-4 text-lg" >
+            <CloudDownload className="w-6 h-6 text-ps-blue" />
+            <span>Cloud Repository</span>
+          </h3>
+          <button onClick={fetchRemote} className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-ps-blue">
+            <RefreshCw className={cn("w-5 h-5", loading && "animate-spin")} />
+          </button>
+        </div>
+        
+        {loading && remotePayloads.length === 0 ? (
+          <div className="py-24 glass-panel rounded-ps-3xl border-white/5 flex flex-col items-center justify-center space-y-6">
+            <Loader2 className="w-16 h-16 text-ps-blue animate-spin" />
+            <p className="label-caps animate-pulse">Syncing with Repository...</p>
+          </div>
+        ) : error ? (
+          <div className="py-20 glass-card rounded-ps-3xl border-red-500/20 flex flex-col items-center justify-center space-y-6 bg-red-950/5">
+             <AlertTriangle className="w-16 h-16 text-red-500 opacity-50" />
+             <div className="text-center">
+               <p className="text-xl font-bold text-white uppercase tracking-tight">Repository Unavailable</p>
+               <p className="text-zinc-500 mt-1">Check your internet connection and try again.</p>
+             </div>
+             <button onClick={fetchRemote} className="px-8 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl font-bold uppercase text-xs transition-all">Retry Connection</button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {cloudItems.length === 0 ? (
+              <div className="py-20 border-2 border-dashed border-white/5 rounded-ps-3xl flex flex-col items-center justify-center space-y-4 bg-white/[0.01]">
+                <ShieldCheck className="w-16 h-16 text-emerald-500/10" />
+                <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm italic">Repository Up to Date</p>
+              </div>
+            ) : (
+              cloudItems.map((p, i) => (
+                <div key={i} className="glass-card p-8 rounded-ps-3xl flex flex-col md:flex-row md:items-center justify-between gap-8 border-white/10 hover:border-ps-blue/20 transition-all bg-white/[0.01]">
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-4">
+                      <PayloadName path={p.filename} className="text-2xl" versionClassName="text-sm px-3 py-1 bg-ps-blue/10 text-ps-blue border-ps-blue/20" />
+                    </div>
+                    <p className="text-lg text-zinc-400 font-medium max-w-3xl leading-relaxed">{p.description}</p>
+                  </div>
+
+                  <button
+                    onClick={() => onInstall(p, p.installedFilename)}
+                    className={cn(
+                      "flex items-center justify-center space-x-4 px-8 py-5 rounded-2xl font-bold text-xl transition-all shadow-2xl shrink-0 transform active:scale-95",
+                      p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20" : "bg-ps-blue hover:bg-ps-blue/80 text-white shadow-ps-blue/20"
+                    )}
+                  >
+                    <CloudDownload className="w-7 h-7" />
+                    <span>{p.isUpdate ? "Update" : "Install"}</span>
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </section>
+      
+      {/* Footer Info for PS5 */}
+      {isPS5 && (
+        <div className="glass-card p-10 rounded-ps-3xl flex flex-col md:flex-row items-center space-y-8 md:space-y-0 md:space-x-12 border-white/10 bg-black/40 mt-16">
+          <div className="bg-white p-6 rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)] shrink-0">
+            <QRCodeSVG value={`http://${window.location.host}`} size={160} level="M" />
+          </div>
+          <div className="flex-1 space-y-4 text-center md:text-left">
+            <h4 className="label-caps text-ps-blue text-lg">Remote File Management</h4>
+            <p className="text-lg text-zinc-400 leading-relaxed italic font-medium">
+              Access this dashboard from your computer or phone to upload payloads directly. Visit <code>http://{window.location.host}</code> to get started.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -730,7 +697,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
   const renderSequence = () => (
     <div className="space-y-8 animate-fade-in flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between">
-        <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
+        <h2 className="text-4xl font-extrabold text-white tracking-tight">
           Autoload <span className="text-ps-blue">Sequence</span>
         </h2>
         <button
@@ -766,7 +733,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
           {autoloadList.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center opacity-10 italic py-20">
               <RefreshCw className="w-16 h-16 mb-4" />
-              <p className="text-2xl font-black uppercase">Sequence Empty</p>
+              <p className="text-2xl font-bold">Sequence Empty</p>
             </div>
           )}
         </div>
@@ -774,7 +741,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
         <button 
           onClick={handleSave} 
           className={cn(
-            "w-full py-5 rounded-2xl font-black uppercase italic tracking-tighter text-xl transition-all shadow-2xl flex items-center justify-center space-x-3",
+            "w-full py-5 rounded-2xl font-bold tracking-tight text-xl transition-all shadow-2xl flex items-center justify-center space-x-3",
             saved ? "bg-emerald-600 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
           )}
         >
@@ -804,7 +771,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
         </div>
         <button
           onClick={() => handleToggle(true)}
-          className="px-8 md:px-12 py-5 md:py-6 bg-ps-blue text-white text-lg md:text-2xl font-black uppercase rounded-2xl md:rounded-[1.5rem] hover:bg-ps-blue/80 transition-all transform active:scale-95 shadow-[0_0_40px_rgba(0,149,255,0.3)]"
+          className="px-8 md:px-12 py-5 md:py-6 bg-ps-blue text-white text-lg md:text-2xl font-extrabold rounded-2xl md:rounded-[1.5rem] hover:bg-ps-blue/80 transition-all transform active:scale-95 shadow-[0_0_40px_rgba(0,149,255,0.3)]"
         >
           Enable Autoload
         </button>
@@ -974,7 +941,7 @@ const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs }) => {
 
   return (
     <div className="space-y-12 animate-fade-in pb-20">
-      <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
+      <h2 className="text-4xl font-extrabold text-white tracking-tight">
         System <span className="text-ps-blue">Information</span>
       </h2>
 
@@ -1288,7 +1255,7 @@ function App() {
               <div className="p-2 bg-ps-blue rounded-xl shadow-[0_0_20px_rgba(0,112,209,0.3)]">
                 <Cpu className="w-6 h-6 text-white" />
               </div>
-              <span className="text-2xl font-black italic uppercase tracking-tighter text-white">Next<span className="text-ps-blue">Menu</span></span>
+              <span className="text-2xl font-bold tracking-tight text-white">Next<span className="text-ps-blue">Menu</span></span>
             </div>
           </div>
 
@@ -1334,7 +1301,7 @@ function App() {
         <main className="md:flex-1 md:overflow-y-auto custom-scrollbar p-6 md:p-16 pb-24 md:pb-16 max-w-[1800px] mx-auto w-full flex flex-col">
           {view === 'dashboard' && (
             <div className="space-y-8 md:space-y-12">
-              <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
+              <h2 className="text-4xl font-extrabold text-white tracking-tight">
                 Launch <span className="text-ps-blue">Payload</span>
               </h2>
               <div className={cn(
@@ -1343,19 +1310,19 @@ function App() {
               )}>
                 {loadingPayloads ? (
                   Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="glass-card p-6 rounded-ps-xl flex items-center space-x-4 border-white/5 animate-pulse">
-                      <div className="w-12 h-12 bg-white/5 rounded-xl" />
-                      <div className="h-6 w-32 bg-white/5 rounded" />
+                    <div key={i} className="glass-card p-6 rounded-ps-xl flex flex-col space-y-2 border-white/5 animate-pulse">
+                      <div className="h-7 w-40 bg-white/5 rounded-lg" />
+                      <div className="h-3 w-20 bg-white/5 rounded-md opacity-50" />
                     </div>
                   ))
                 ) : payloads.length === 0 ? (
                   <div className="col-span-full py-20 border-2 border-dashed border-white/5 rounded-ps-xl flex flex-col items-center justify-center space-y-6 bg-white/[0.01]">
                     <Package className="w-16 h-16 text-white/10" />
                     <div className="text-center">
-                      <p className="text-white font-black uppercase italic tracking-tighter text-2xl">Empty Library</p>
+                      <p className="text-white font-extrabold tracking-tight text-2xl">Empty Library</p>
                       <p className="text-zinc-500 font-medium">Add payloads from the Cloud Hub to get started.</p>
                     </div>
-                    <button onClick={() => setView('storage')} className="px-8 py-3 bg-ps-blue text-white rounded-xl font-bold uppercase tracking-tight shadow-xl shadow-ps-blue/20">Open Repository</button>
+                    <button onClick={() => setView('storage')} className="px-8 py-3 bg-ps-blue text-white rounded-xl font-bold tracking-tight shadow-xl shadow-ps-blue/20">Open Repository</button>
                   </div>
                 ) : (
                   payloads.map((p, i) => (
@@ -1393,7 +1360,7 @@ function App() {
             <div className="absolute inset-0 w-32 h-32 border-8 border-ps-blue rounded-full border-t-transparent animate-spin shadow-[0_0_50px_rgba(0,149,255,0.5)]" />
           </div>
           <div className="text-center">
-            <h4 className="text-4xl font-black italic text-white uppercase tracking-tighter mb-3">{activeLoadingName || "Engaging Core"}</h4>
+            <h4 className="text-4xl font-extrabold text-white tracking-tight mb-3">{activeLoadingName || "Engaging Core"}</h4>
             <p className="label-caps !text-[16px] animate-pulse text-ps-blue">LAUNCHING PAYLOAD. PLEASE WAIT...</p>
           </div>
         </div>
