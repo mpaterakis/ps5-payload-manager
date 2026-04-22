@@ -52,7 +52,7 @@ int ps5_launch_elf(const char *path) {
   }
 
   /* Stream the file */
-  char buffer[16384];
+  char buffer[8192];
   ssize_t read_bytes;
   while ((read_bytes = read(fd, buffer, sizeof(buffer))) > 0) {
     ssize_t sent = send(sock, buffer, read_bytes, 0);

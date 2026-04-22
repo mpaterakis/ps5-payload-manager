@@ -4,7 +4,7 @@ import { cn, isPS5 } from '../../utils/helpers'
 import PayloadName from '../ui/PayloadName'
 import Modal from '../ui/Modal'
 
-const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
+const AutoloadView = ({ payloads, config, onSaveConfig, onToast, onRedirect }) => {
   const [subView, setSubView] = useState('list')
   const [enabled, setEnabled] = useState(false)
   const [autoloadList, setAutoloadList] = useState([])
@@ -148,6 +148,19 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast }) => {
                 <span className="font-bold text-white uppercase tracking-tight text-xl">Add Delay</span>
               </div>
               <ArrowRight className="w-6 h-6 text-zinc-500 group-hover:text-ps-blue group-hover:translate-x-2 transition-all" />
+            </button>
+          </div>
+          <div className="pt-8 border-t border-white/5 mt-8 text-center space-y-4">
+            <p className="text-zinc-500 text-sm font-bold uppercase tracking-widest opacity-60">Missing a payload?</p>
+            <button 
+              onClick={() => onRedirect('storage')}
+              className="group flex flex-col items-center mx-auto space-y-3"
+            >
+              <div className="flex items-center space-x-3 text-ps-blue group-hover:text-white transition-colors">
+                <ShieldCheck className="w-5 h-5" />
+                <span className="font-black italic text-lg uppercase tracking-tight">Move from USB to Internal</span>
+              </div>
+              <p className="text-xs text-zinc-600 max-w-[200px] leading-relaxed">Required for payloads you want to use in the Autoload sequence.</p>
             </button>
           </div>
         </div>

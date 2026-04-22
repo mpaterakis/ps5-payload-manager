@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { CloudDownload, Upload, Package, Database, RefreshCw, Trash2, ShieldCheck, Loader2, AlertTriangle } from 'lucide-react'
+import { CloudDownload, Upload, Package, Database, RefreshCw, Trash2, ShieldCheck, Loader2, AlertTriangle, HardDrive, Usb } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { cn, isPS5 } from '../../utils/helpers'
 import PayloadName from '../ui/PayloadName'
 
-const StorageHub = ({ payloads, onInstall, onDelete, onUpload, ip }) => {
+const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, ip }) => {
   const [remotePayloads, setRemotePayloads] = useState([])
+  const [repoUrl, setRepoUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(0)
@@ -41,6 +42,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, ip }) => {
 
       if (!Array.isArray(data?.payloads)) throw new Error()
       setRemotePayloads(data.payloads)
+      setRepoUrl(data.repo_url || '')
       setLastUpdate(Number(data.last_update || 0))
     } catch (e) {
       setError(true)
@@ -58,9 +60,10 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, ip }) => {
 
   const getBaseName = (filename) => {
     if (!filename) return '';
-    const clean = filename.replace(/\.(elf|bin|lua)$/i, '');
-    const versionMatch = clean.match(/[_-](v?\d+[\d.a-z-]+)/i);
-    return versionMatch ? clean.replace(versionMatch[0], '') : clean;
+    let clean = filename.replace(/\.(elf|bin|lua)$/i, '');
+    const versionMatch = clean.match(/[_-]v?(\d+[\d.a-z-]+)/i);
+    if (versionMatch) clean = clean.replace(versionMatch[0], '');
+    return clean.replace(/[_-]ps[45]$/i, '');
   }
 
   const remoteStatus = useMemo(() => {
@@ -132,7 +135,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, ip }) => {
                   <div className="flex items-center space-x-4">
                     {remoteMatch?.isUpdate && (
                       <button
-                        onClick={() => onInstall(remoteMatch)}
+                        onClick={() => onInstall(remoteMatch, repoUrl)}
                         className="flex items-center space-x-3 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm transition-all shadow-xl shadow-emerald-900/20"
                       >
                         <RefreshCw className="w-5 h-5 animate-spin-slow" />
@@ -145,6 +148,54 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, ip }) => {
                       title="Remove Payload"
                     >
                       <Trash2 className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </section>
+
+      {/* USB Storage Section */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="label-caps !text-ps-blue flex items-center space-x-4 text-lg">
+            <HardDrive className="w-6 h-6" />
+            <span>USB Storage</span>
+          </h3>
+          <span className="bg-ps-blue/5 px-4 py-1 rounded-full text-ps-blue font-bold text-xs border border-ps-blue/20">
+            {payloads.filter(p => p.includes('/mnt/usb')).length} Files
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          {payloads.filter(p => p.includes('/mnt/usb')).length === 0 ? (
+            <div className="py-20 border-2 border-dashed border-white/5 rounded-ps-3xl flex flex-col items-center justify-center space-y-4 bg-white/[0.01]">
+              <HardDrive className="w-16 h-16 text-white/5" />
+              <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm italic">No USB Payloads Found</p>
+            </div>
+          ) : (
+            payloads.filter(p => p.includes('/mnt/usb')).map((path, i) => {
+              const fileName = path.split('/').pop()
+              return (
+                <div key={i} className="group flex items-center justify-between p-6 glass-card rounded-ps-2xl border-white/10 hover:border-ps-blue/30">
+                  <div className="flex items-center space-x-6">
+                    <div className="p-4 bg-white/5 rounded-2xl group-hover:bg-ps-blue/10 transition-colors">
+                      <Usb className="w-8 h-8 text-zinc-400 group-hover:text-ps-blue transition-colors" />
+                    </div>
+                    <div className="space-y-1">
+                      <PayloadName path={path} className="text-2xl" versionClassName="text-sm px-3 py-1 bg-ps-blue/10 text-ps-blue border-ps-blue/20" hideIcon={true} />
+                      <p className="text-[10px] text-zinc-600 font-medium font-mono uppercase tracking-tighter opacity-60">{path}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => onImportFromUsb(path)}
+                      className="flex items-center space-x-3 px-6 py-4 bg-white/5 hover:bg-ps-blue text-white rounded-xl font-bold text-sm transition-all border border-white/10 hover:border-ps-blue shadow-xl group/btn"
+                    >
+                      <Database className="w-5 h-5 text-ps-blue group-hover/btn:text-white transition-colors" />
+                      <span>Move to Internal</span>
                     </button>
                   </div>
                 </div>
@@ -206,7 +257,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, ip }) => {
                   </div>
 
                   <button
-                    onClick={() => onInstall(p)}
+                    onClick={() => onInstall(p, repoUrl)}
                     className={cn(
                       "flex items-center justify-center space-x-4 px-8 py-5 rounded-2xl font-bold text-xl transition-all shadow-2xl shrink-0 transform active:scale-95",
                       p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20" : "bg-ps-blue hover:bg-ps-blue/80 text-white shadow-ps-blue/20"

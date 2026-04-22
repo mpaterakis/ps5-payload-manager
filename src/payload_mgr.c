@@ -563,10 +563,10 @@ static int is_supported_extension(const char *filename) {
         dst[pos] = '\0';
     }
 
-    static int write_payload_details_json(const RepoPayload *item, const char *details_path) {
+    static int write_payload_details_json(const RepoPayload *item, const char *details_path, const char *install_source, const char *install_source_detail) {
         char name[256], filename[384], url[1400], source[1400], source_direct[1400];
         char description[1400], last_update[128], version[128], checksum[128];
-        char downloaded_at[64];
+        char downloaded_at[64], i_src[256], i_detail[1400];
         char json_buf[8192];
         time_t now = time(NULL);
         struct tm tmv;
@@ -584,6 +584,8 @@ static int is_supported_extension(const char *filename) {
         json_escape(item->last_update, last_update, sizeof(last_update));
         json_escape(item->version, version, sizeof(version));
         json_escape(item->checksum, checksum, sizeof(checksum));
+        json_escape(install_source ? install_source : "unknown", i_src, sizeof(i_src));
+        json_escape(install_source_detail ? install_source_detail : "", i_detail, sizeof(i_detail));
 
         snprintf(json_buf, sizeof(json_buf),
                  "{\n"
@@ -596,20 +598,83 @@ static int is_supported_extension(const char *filename) {
                  "  \"last_update\": \"%s\",\n"
                  "  \"version\": \"%s\",\n"
                  "  \"checksum\": \"%s\",\n"
-                 "  \"downloaded_at\": \"%s\"\n"
+                 "  \"downloaded_at\": \"%s\",\n"
+                 "  \"install_source\": \"%s\",\n"
+                 "  \"install_source_detail\": \"%s\"\n"
                  "}\n",
-                 name,
-                 filename,
-                 url,
-                 source,
-                 source_direct,
-                 description,
-                 last_update,
-                 version,
-                 checksum,
-                 downloaded_at);
+                 name, filename, url, source, source_direct, description,
+                 last_update, version, checksum, downloaded_at, i_src, i_detail);
 
-        return write_file_text(details_path, json_buf, strlen(json_buf));
+        FILE *f = fopen(details_path, "w");
+        if (!f) return -1;
+        fwrite(json_buf, 1, strlen(json_buf), f);
+        fclose(f);
+        return 0;
+    }
+
+    static int write_simple_payload_details_json(const char *filename, const char *details_path, const char *install_source, const char *install_source_detail) {
+        RepoPayload item;
+        memset(&item, 0, sizeof(item));
+        strncpy(item.name, filename, sizeof(item.name) - 1);
+        strncpy(item.filename, filename, sizeof(item.filename) - 1);
+        return write_payload_details_json(&item, details_path, install_source, install_source_detail);
+    }
+
+    int payload_mgr_write_metadata(const char *payload_path, const char *install_source, const char *install_source_detail) {
+        char details_path[700];
+        const char *filename = strrchr(payload_path, '/');
+        if (filename) filename++;
+        else filename = payload_path;
+
+        snprintf(details_path, sizeof(details_path), "%s.json", payload_path);
+        return write_simple_payload_details_json(filename, details_path, install_source, install_source_detail);
+    }
+
+    int payload_mgr_import_to_storage(const char *filename, const char *temp_path, const char *install_source, const char *install_source_detail, char *msg_buf, size_t msg_buf_size) {
+        char folder_name[128];
+        char payload_dir[512];
+        char final_path[640];
+        char details_path[700];
+
+        nm_utils_get_payload_folder_name(filename, folder_name, sizeof(folder_name));
+        snprintf(payload_dir, sizeof(payload_dir), "%s/%s", PAYLOADS_STORAGE_DIR, folder_name);
+        
+        if (ensure_dir_recursive(payload_dir) != 0) {
+            snprintf(msg_buf, msg_buf_size, "Failed to create directory");
+            return -1;
+        }
+
+        snprintf(final_path, sizeof(final_path), "%s/%s", payload_dir, filename);
+        snprintf(details_path, sizeof(details_path), "%s/%s.json", payload_dir, filename);
+
+        /* Clean up previous version if it has the same folder name but different filename */
+        remove_regular_files_in_dir(payload_dir, filename);
+
+        if (rename(temp_path, final_path) != 0) {
+            snprintf(msg_buf, msg_buf_size, "Failed to move file");
+            return -1;
+        }
+
+        write_simple_payload_details_json(filename, details_path, install_source, install_source_detail);
+        return 0;
+    }
+
+    int payload_mgr_check_existing(const char *filename, char *out_json, size_t out_size) {
+        char folder_name[128];
+        char folder_path[512];
+        char file_path[640];
+        struct stat st;
+
+        nm_utils_get_payload_folder_name(filename, folder_name, sizeof(folder_name));
+        snprintf(folder_path, sizeof(folder_path), "%s/%s", PAYLOADS_STORAGE_DIR, folder_name);
+        snprintf(file_path, sizeof(file_path), "%s/%s", folder_path, filename);
+
+        int folder_exists = (stat(folder_path, &st) == 0 && S_ISDIR(st.st_mode));
+        int file_exists = (stat(file_path, &st) == 0 && S_ISREG(st.st_mode));
+
+        snprintf(out_json, out_size, "{\"status\":\"ok\", \"folder_exists\":%d, \"file_exists\":%d, \"folder_name\":\"%s\"}", 
+                 folder_exists, file_exists, folder_name);
+        return 0;
     }
 
     static void scan_payloads_recursive(const char *dir_path, int depth, int max_depth, JsonListBuilder *jb) {
@@ -753,6 +818,113 @@ static int is_supported_extension(const char *filename) {
 
         json_append(&jb, "]}");
         return jb.pos;
+    }
+
+    static int copy_file(const char *src, const char *dst) {
+        FILE *fs = fopen(src, "rb");
+        if (!fs) return -1;
+        FILE *fd = fopen(dst, "wb");
+        if (!fd) {
+            fclose(fs);
+            return -1;
+        }
+        unsigned char buf[8192];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof(buf), fs)) > 0) {
+            if (fwrite(buf, 1, n, fd) != n) {
+                fclose(fs);
+                fclose(fd);
+                return -1;
+            }
+        }
+        fclose(fs);
+        fclose(fd);
+        return 0;
+    }
+
+    int payload_mgr_usb_check(const char *usb_path, char *out_json, size_t out_size) {
+        char usb_sha[65];
+        char int_sha[65];
+        char internal_path[512];
+        const char *filename = strrchr(usb_path, '/');
+        if (!filename) filename = usb_path;
+        else filename++;
+
+        if (compute_sha256_file(usb_path, usb_sha) != 0) {
+            snprintf(out_json, out_size, "{\"error\":\"Failed to compute USB SHA256\"}");
+            return -1;
+        }
+
+        char folder_name[128];
+        nm_utils_get_payload_folder_name(filename, folder_name, sizeof(folder_name));
+        snprintf(internal_path, sizeof(internal_path), "%s/%s/%s", PAYLOADS_STORAGE_DIR, folder_name, filename);
+        
+        char folder_path[512];
+        snprintf(folder_path, sizeof(folder_path), "%s/%s", PAYLOADS_STORAGE_DIR, folder_name);
+
+        struct stat st;
+        int folder_exists = (stat(folder_path, &st) == 0 && S_ISDIR(st.st_mode));
+
+        if (stat(internal_path, &st) == 0) {
+            if (compute_sha256_file(internal_path, int_sha) == 0) {
+                if (strcmp(usb_sha, int_sha) == 0) {
+                    snprintf(out_json, out_size, "{\"status\":\"exists_same\", \"filename\":\"%s\", \"sha256\":\"%s\", \"folder_exists\":%d}", filename, usb_sha, folder_exists);
+                } else {
+                    snprintf(out_json, out_size, "{\"status\":\"exists_different\", \"filename\":\"%s\", \"sha256\":\"%s\", \"folder_exists\":%d}", filename, usb_sha, folder_exists);
+                }
+            } else {
+                snprintf(out_json, out_size, "{\"status\":\"exists_error\", \"filename\":\"%s\", \"folder_exists\":%d}", filename, folder_exists);
+            }
+        } else {
+            snprintf(out_json, out_size, "{\"status\":\"new\", \"filename\":\"%s\", \"sha256\":\"%s\", \"folder_exists\":%d}", filename, usb_sha, folder_exists);
+        }
+        
+        return 0;
+    }
+
+    int payload_mgr_usb_move(const char *usb_path, int overwrite, char *out_json, size_t out_size) {
+        char usb_sha[65];
+        char check_sha[65];
+        char temp_path[512];
+        const char *filename = strrchr(usb_path, '/');
+        if (!filename) filename = usb_path;
+        else filename++;
+
+        snprintf(temp_path, sizeof(temp_path), "%s/%s.tmp", PAYLOADS_STORAGE_DIR, filename);
+
+        if (compute_sha256_file(usb_path, usb_sha) != 0) {
+            snprintf(out_json, out_size, "{\"error\":\"Failed to compute USB SHA256\"}");
+            return -1;
+        }
+
+        ensure_dir_recursive(PAYLOADS_STORAGE_DIR);
+        if (copy_file(usb_path, temp_path) != 0) {
+            snprintf(out_json, out_size, "{\"error\":\"Failed to copy file to internal storage\"}");
+            remove(temp_path);
+            return -1;
+        }
+
+        if (compute_sha256_file(temp_path, check_sha) != 0 || strcmp(usb_sha, check_sha) != 0) {
+            snprintf(out_json, out_size, "{\"error\":\"SHA256 verification failed after copy\"}");
+            remove(temp_path);
+            return -1;
+        }
+
+        char msg[256];
+        if (payload_mgr_import_to_storage(filename, temp_path, "usb_move", usb_path, msg, sizeof(msg)) != 0) {
+            snprintf(out_json, out_size, "{\"error\":\"%s\"}", msg);
+            remove(temp_path);
+            return -1;
+        }
+
+        if (remove(usb_path) != 0) {
+            nm_log("[NextMenu] Warning: Failed to remove original file from USB: %s\n", usb_path);
+            snprintf(out_json, out_size, "{\"status\":\"ok\", \"warning\":\"copied but failed to delete from usb\"}");
+        } else {
+            snprintf(out_json, out_size, "{\"status\":\"ok\"}");
+        }
+
+        return 0;
     }
 
     int payload_mgr_resolve_path(const char *filename, char *out_path, size_t out_size) {
@@ -927,14 +1099,14 @@ static int is_supported_extension(const char *filename) {
         }
 
         pos += (size_t)snprintf(json_buf + pos, buf_size - pos,
-                                ",\"last_update\":%ld,\"cache_status\":\"ok\"}",
-                                last_update);
+                                ",\"last_update\":%ld,\"cache_status\":\"ok\",\"repo_url\":\"%s\"}",
+                                last_update, REPOSITORY_SOURCE_URL);
 
         free(cached);
         return pos;
     }
 
-    int payload_mgr_repository_install_commit(const char *filename, const char *uploaded_temp_path, char *msg_buf, size_t msg_buf_size) {
+    int payload_mgr_repository_install_commit(const char *filename, const char *uploaded_temp_path, const char *install_source, const char *install_source_detail, char *msg_buf, size_t msg_buf_size) {
         RepoPayload *items = NULL;
         size_t count = 0;
         int found = -1;
@@ -986,7 +1158,9 @@ static int is_supported_extension(const char *filename) {
             return -1;
         }
 
-        snprintf(payload_dir, sizeof(payload_dir), "%s/%s", PAYLOADS_STORAGE_DIR, items[found].name);
+        char folder_name[128];
+        nm_utils_get_payload_folder_name(items[found].filename, folder_name, sizeof(folder_name));
+        snprintf(payload_dir, sizeof(payload_dir), "%s/%s", PAYLOADS_STORAGE_DIR, folder_name);
         if (ensure_dir_recursive(payload_dir) != 0) {
             free(items);
             snprintf(msg_buf, msg_buf_size, "Failed to create payload directory");
@@ -1023,7 +1197,7 @@ static int is_supported_extension(const char *filename) {
             return -1;
         }
 
-        if (write_payload_details_json(&items[found], details_path) != 0) {
+        if (write_payload_details_json(&items[found], details_path, install_source, install_source_detail) != 0) {
             free(items);
             remove(final_path);
             snprintf(msg_buf, msg_buf_size, "Failed to write payload metadata");

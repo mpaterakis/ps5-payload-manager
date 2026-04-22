@@ -28,6 +28,7 @@ import AutoloadView from './components/views/AutoloadView'
 import SettingsView from './components/views/SettingsView'
 import DonateView from './components/views/DonateView'
 import AutoloadOverlay from './components/views/AutoloadOverlay'
+import MoveFromUsbView from './components/views/MoveFromUsbView'
 
 function App() {
   const [view, setView] = useState('dashboard')
@@ -44,6 +45,7 @@ function App() {
   const [loadingPayloads, setLoadingPayloads] = useState(true)
   const [downloadModal, setDownloadModal] = useState({ show: false, name: '', progress: 0 })
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null })
+  const [moveFromUsbPath, setMoveFromUsbPath] = useState(null)
 
   const addToast = (message, type = 'success') => {
     const id = Date.now()
@@ -135,6 +137,29 @@ function App() {
   const handleUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+
+    try {
+      const res = await fetch(`/manage:check?filename=${encodeURIComponent(file.name)}`)
+      const data = await res.json()
+      if (data.file_exists || data.folder_exists) {
+        setConfirmModal({
+          show: true,
+          title: "Overwrite Payload",
+          message: data.file_exists 
+            ? `The file ${file.name} already exists. Overwrite it?`
+            : `A different version of this payload exists in the "${data.folder_name}" folder. Overwrite it?`,
+          onConfirm: () => performUpload(file)
+        })
+      } else {
+        performUpload(file)
+      }
+    } catch (err) {
+      performUpload(file)
+    }
+  }
+
+  const performUpload = async (file) => {
+    setConfirmModal({ show: false })
     setDownloadModal({ show: true, name: file.name, progress: 20 })
     try {
       await fetch(`/manage:upload?filename=${encodeURIComponent(file.name)}`, {
@@ -149,7 +174,21 @@ function App() {
     setTimeout(() => setDownloadModal({ show: false }), 800)
   }
 
-  const handleInstall = async (p) => {
+  const handleInstall = async (p, repoUrl) => {
+    if (p.isUpdate || p.isInstalled) {
+      setConfirmModal({
+        show: true,
+        title: p.isUpdate ? "Update Payload" : "Reinstall Payload",
+        message: `A version of ${p.name || p.filename} is already installed. Do you want to replace it with the repository version?`,
+        onConfirm: () => performInstall(p, repoUrl)
+      })
+    } else {
+      performInstall(p, repoUrl)
+    }
+  }
+
+  const performInstall = async (p, repoUrl) => {
+    setConfirmModal({ show: false })
     setDownloadModal({ show: true, name: p.filename, progress: 10 })
     try {
       const elfRes = await fetch(p.url)
@@ -160,7 +199,7 @@ function App() {
       setDownloadModal(prev => ({ ...prev, progress: 70 }))
 
       const pushRes = await fetch(
-        `/repository_install_push?filename=${encodeURIComponent(p.filename)}`,
+        `/repository_install_push?filename=${encodeURIComponent(p.filename)}&repo_url=${encodeURIComponent(repoUrl || '')}`,
         { method: 'POST', body: buffer }
       )
       setDownloadModal(prev => ({ ...prev, progress: 90 }))
@@ -173,6 +212,11 @@ function App() {
       } else throw new Error(data?.message || 'Install failed')
     } catch (e) { addToast(e.message || 'Installation failed', 'error') }
     setTimeout(() => setDownloadModal({ show: false }), 800)
+  }
+
+  const handleImportFromUsb = (path) => {
+    setMoveFromUsbPath(path)
+    setView('move_from_usb')
   }
 
   const handleSaveConfig = async (newConfig) => {
@@ -388,11 +432,30 @@ function App() {
           )}
 
           {view === 'storage' && (
-            <StorageHub payloads={payloads} onInstall={handleInstall} onDelete={handleDelete} onUpload={handleUpload} ip={ip} />
+            <StorageHub payloads={payloads} onInstall={handleInstall} onDelete={handleDelete} onUpload={handleUpload} onImportFromUsb={handleImportFromUsb} ip={ip} />
+          )}
+
+          {view === 'move_from_usb' && moveFromUsbPath && (
+            <MoveFromUsbView 
+              path={moveFromUsbPath} 
+              onBack={() => setView('storage')} 
+              onComplete={() => {
+                refreshPayloads()
+                setView('storage')
+                setMoveFromUsbPath(null)
+              }}
+              addToast={addToast}
+            />
           )}
 
           {view === 'autoload' && (
-            <AutoloadView payloads={payloads} config={config} onSaveConfig={handleSaveConfig} onToast={addToast} />
+            <AutoloadView 
+              payloads={payloads} 
+              config={config} 
+              onSaveConfig={handleSaveConfig} 
+              onToast={addToast} 
+              onRedirect={(v) => setView(v)}
+            />
           )}
 
           {view === 'settings' && (

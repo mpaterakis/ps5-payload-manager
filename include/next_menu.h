@@ -9,6 +9,7 @@
 #define ROUTE_INDEX_HTML "/index.html"
 #define ROUTE_LIST_PAYLOADS "/list_payloads"
 #define ROUTE_UPLOAD "/manage:upload"
+#define ROUTE_CHECK "/manage:check"
 #define ROUTE_DELETE "/manage:delete"
 #define ROUTE_LOAD_PAYLOAD "/loadpayload:"
 #define ROUTE_SHUTDOWN "/shutdown"
@@ -25,6 +26,8 @@
 #define ROUTE_REPO_INSTALL "/repository_install"
 #define ROUTE_REPO_PUSH "/repository_push"
 #define ROUTE_REPO_INSTALL_PUSH "/repository_install_push"
+#define ROUTE_USB_MOVE_CHECK "/usb_move_check"
+#define ROUTE_USB_MOVE_PERFORM "/usb_move_perform"
 
 #define MENU_VERSION "1.0.0"
 #define AUTOLOAD_CONFIG_PATH "/data/next_menu/autoload.txt"

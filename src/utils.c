@@ -37,3 +37,39 @@ int nm_get_local_ip(char *ip_buf, size_t buf_size) {
     freeifaddrs(ifaddr);
     return -1;
 }
+
+void nm_utils_get_payload_folder_name(const char *filename, char *out_buf, size_t out_size) {
+    char clean[256];
+    strncpy(clean, filename, sizeof(clean) - 1);
+    clean[sizeof(clean) - 1] = '\0';
+
+    /* Strip extension */
+    char *dot = strrchr(clean, '.');
+    if (dot) *dot = '\0';
+
+    /* Look for version marker like _v1.2.3 or -v1.2.3 */
+    char *v = strstr(clean, "_v");
+    if (!v) v = strstr(clean, "-v");
+    
+    if (v) {
+        *v = '\0';
+    } else {
+        /* Fallback: look for just _ or - followed by digit */
+        for (int i = 0; clean[i]; i++) {
+            if ((clean[i] == '_' || clean[i] == '-') && (clean[i+1] >= '0' && clean[i+1] <= '9')) {
+                clean[i] = '\0';
+                break;
+            }
+        }
+    }
+
+    /* Further clean: remove -ps4, -ps5 suffixes if they were before the version */
+    char *p = strstr(clean, "-ps5");
+    if (!p) p = strstr(clean, "_ps5");
+    if (!p) p = strstr(clean, "-ps4");
+    if (!p) p = strstr(clean, "_ps4");
+    if (p) *p = '\0';
+
+    strncpy(out_buf, clean, out_size - 1);
+    out_buf[out_size - 1] = '\0';
+}

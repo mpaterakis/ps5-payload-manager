@@ -153,6 +153,7 @@ struct UploadStatus {
   int error;
   char filename[256];
   char temp_path[512];
+  char repo_url[512];
 };
 
 static void read_next_config_values(int *enabled, long *repo_update,
@@ -244,18 +245,23 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
 
       const char *filename =
           MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "filename");
-      if (filename) {
+      if (filename && !strstr(filename, "/") && !strstr(filename, "..")) {
         char path[512];
-        snprintf(path, sizeof(path), "%s/%s", BASE_DATA_DIR, filename);
-
         mkdir(BASE_DATA_DIR, 0777);
+        mkdir(PAYLOADS_STORAGE_DIR, 0777);
+        snprintf(path, sizeof(path), "%s/%s.tmp", PAYLOADS_STORAGE_DIR, filename);
+
+        strncpy(status->filename, filename, sizeof(status->filename) - 1);
+        status->filename[sizeof(status->filename) - 1] = '\0';
+        strncpy(status->temp_path, path, sizeof(status->temp_path) - 1);
+        status->temp_path[sizeof(status->temp_path) - 1] = '\0';
 
         status->fp = fopen(path, "wb");
         if (!status->fp) {
-          nm_log("[NextMenu] !!! FAILED to open file: %s\n", path);
+          nm_log("[NextMenu] !!! FAILED to open temp file: %s\n", path);
           status->error = 1;
         } else {
-          nm_log("[NextMenu] Starting upload to: %s\n", path);
+          nm_log("[NextMenu] Starting upload to temp: %s\n", path);
         }
       } else {
         nm_log("[NextMenu] !!! Upload failed: Missing filename parameter\n");
@@ -302,6 +308,15 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
         status->filename[sizeof(status->filename) - 1] = '\0';
         strncpy(status->temp_path, path, sizeof(status->temp_path) - 1);
         status->temp_path[sizeof(status->temp_path) - 1] = '\0';
+
+        const char *repo_url = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "repo_url");
+        if (repo_url) {
+            strncpy(status->repo_url, repo_url, sizeof(status->repo_url) - 1);
+            status->repo_url[sizeof(status->repo_url) - 1] = '\0';
+        } else {
+            strncpy(status->repo_url, REPOSITORY_SOURCE_URL, sizeof(status->repo_url) - 1);
+            status->repo_url[sizeof(status->repo_url) - 1] = '\0';
+        }
 
         status->fp = fopen(path, "wb");
         if (!status->fp) {
@@ -539,6 +554,15 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
       if (status->fp) {
         fflush(status->fp);
         fclose(status->fp);
+        status->fp = NULL;
+
+        if (!status->error) {
+           char msg[256];
+           if (payload_mgr_import_to_storage(status->filename, status->temp_path, "web_upload", "", msg, sizeof(msg)) != 0) {
+              nm_log("[NextMenu] !!! Failed to commit upload: %s\n", msg);
+              status->error = 1;
+           }
+        }
       }
       nm_log("[NextMenu] Upload finished. Total bytes: %zu, Error: %d\n",
              status->total_size, status->error);
@@ -582,7 +606,7 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
       if (!err) {
         /* Commit the install: verify SHA256 and move to final destination */
         if (payload_mgr_repository_install_commit(
-                status->filename, status->temp_path, response_buffer,
+                status->filename, status->temp_path, "repository", status->repo_url, response_buffer,
                 sizeof(response_buffer)) != 0) {
           err = 1;
         }
@@ -618,12 +642,62 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
   struct MHD_Response *resp = NULL;
   enum MHD_Result ret;
 
+  if (strcmp(url, ROUTE_USB_MOVE_CHECK) == 0) {
+    const char *path = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "path");
+    if (path) {
+      payload_mgr_usb_check(path, response_buffer, sizeof(response_buffer));
+      resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
+      MHD_add_response_header(resp, "Content-Type", "application/json");
+    } else {
+      const char *err = "{\"error\":\"Missing path\"}";
+      resp = MHD_create_response_from_buffer(strlen(err), (void *)err, MHD_RESPMEM_MUST_COPY);
+      MHD_add_response_header(resp, "Content-Type", "application/json");
+    }
+    MHD_add_response_header(resp, "Access-Control-Allow-Origin", "*");
+    ret = MHD_queue_response(conn, MHD_HTTP_OK, resp);
+    MHD_destroy_response(resp);
+    return ret;
+  }
+
+  if (strcmp(url, ROUTE_USB_MOVE_PERFORM) == 0) {
+    const char *path = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "path");
+    const char *overwrite_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "overwrite");
+    int overwrite = (overwrite_str && strcmp(overwrite_str, "true") == 0) ? 1 : 0;
+    if (path) {
+      payload_mgr_usb_move(path, overwrite, response_buffer, sizeof(response_buffer));
+      resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
+      MHD_add_response_header(resp, "Content-Type", "application/json");
+    } else {
+      const char *err = "{\"error\":\"Missing path\"}";
+      resp = MHD_create_response_from_buffer(strlen(err), (void *)err, MHD_RESPMEM_MUST_COPY);
+      MHD_add_response_header(resp, "Content-Type", "application/json");
+    }
+    MHD_add_response_header(resp, "Access-Control-Allow-Origin", "*");
+    ret = MHD_queue_response(conn, MHD_HTTP_OK, resp);
+    MHD_destroy_response(resp);
+    return ret;
+  }
+
   /* Route: Index or index.html */
   if (strcmp(url, ROUTE_INDEX) == 0 || strcmp(url, ROUTE_INDEX_HTML) == 0) {
     resp = MHD_create_response_from_buffer(assets_index_html_len,
                                            (void *)assets_index_html,
                                            MHD_RESPMEM_PERSISTENT);
     MHD_add_response_header(resp, "Content-Type", "text/html");
+  } else  if (strcmp(url, ROUTE_CHECK) == 0) {
+    const char *filename = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "filename");
+    if (!filename) {
+      const char *err = "{\"error\":\"Missing filename\"}";
+      resp = MHD_create_response_from_buffer(strlen(err), (void *)err, MHD_RESPMEM_MUST_COPY);
+      MHD_add_response_header(resp, "Content-Type", "application/json");
+      MHD_add_response_header(resp, "Access-Control-Allow-Origin", "*");
+      return MHD_queue_response(conn, MHD_HTTP_BAD_REQUEST, resp);
+    }
+    payload_mgr_check_existing(filename, response_buffer, sizeof(response_buffer));
+    resp = MHD_create_response_from_buffer(strlen(response_buffer), (void *)response_buffer, MHD_RESPMEM_MUST_COPY);
+    MHD_add_response_header(resp, "Content-Type", "application/json");
+    MHD_add_response_header(resp, "Access-Control-Allow-Origin", "*");
+    return MHD_queue_response(conn, MHD_HTTP_OK, resp);
   } else if (strcmp(url, ROUTE_LIST_PAYLOADS) == 0) {
     size_t len =
         payload_mgr_list_json(response_buffer, sizeof(response_buffer));
