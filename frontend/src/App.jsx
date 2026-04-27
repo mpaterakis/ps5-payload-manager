@@ -21,6 +21,7 @@ import Toast from './components/ui/Toast'
 import Modal from './components/ui/Modal'
 import NavButton from './components/ui/NavButton'
 import PayloadButton from './components/ui/PayloadButton'
+import LogoIcon from './components/ui/LogoIcon'
 
 // Views
 import StorageHub from './components/views/StorageHub'
@@ -337,7 +338,7 @@ function App() {
             </button>
             <div className={cn("flex items-center space-x-3 transition-all duration-500", sidebarExpanded ? "opacity-100 scale-100" : "opacity-0 scale-90 absolute pointer-events-none")}>
               <div className="p-2 bg-ps-blue rounded-xl shadow-[0_0_20px_rgba(0,112,209,0.3)]">
-                <Cpu className="w-6 h-6 text-white" />
+                <LogoIcon className="w-6 h-6 text-white" />
               </div>
               <span className="text-2xl font-bold tracking-tight text-white">Next<span className="text-ps-blue">Menu</span></span>
             </div>

@@ -13,7 +13,7 @@ const DonateView = () => {
       <div className="space-y-4 md:space-y-6 px-4">
         <h3 className="text-4xl md:text-6xl font-black text-white uppercase italic tracking-tighter">Support <span className="text-red-500">Project</span></h3>
         <p className="text-lg md:text-2xl text-zinc-400 font-medium leading-relaxed italic">
-          Maintaining Next Menu takes significant time and effort. Your support helps keep the project alive and free for everyone. It's much appreciated!
+          If you'd like to support my work or just say thanks, you can buy me a coffee. It's much appreciated!
         </p>
       </div>
 
