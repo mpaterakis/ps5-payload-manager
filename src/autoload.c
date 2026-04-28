@@ -197,7 +197,7 @@ void nm_autoload_update_config_entry(const char *old_filename, const char *new_f
     int line_count = 0;
     int modified = 0;
 
-    while (fgets(lines[line_count], sizeof(lines[0]), f) && line_count < 100) {
+    while (line_count < 100 && fgets(lines[line_count], sizeof(lines[0]), f)) {
         char clean_line[256];
         strcpy(clean_line, lines[line_count]);
         clean_line[strcspn(clean_line, "\r\n")] = 0;

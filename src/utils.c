@@ -73,3 +73,22 @@ void nm_utils_get_payload_folder_name(const char *filename, char *out_buf, size_
     strncpy(out_buf, clean, out_size - 1);
     out_buf[out_size - 1] = '\0';
 }
+
+void nm_json_escape(const char *src, char *dst, size_t dst_size) {
+    size_t pos = 0;
+    if (dst_size == 0) {
+        return;
+    }
+
+    for (size_t i = 0; src[i] != '\0' && pos + 1 < dst_size; i++) {
+        unsigned char c = (unsigned char)src[i];
+        if ((c == '"' || c == '\\') && pos + 2 < dst_size) {
+            dst[pos++] = '\\';
+            dst[pos++] = (char)c;
+        } else if (c >= 0x20 && c <= 0x7E) {
+            dst[pos++] = (char)c;
+        }
+    }
+
+    dst[pos] = '\0';
+}

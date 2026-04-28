@@ -78,6 +78,17 @@ static int is_supported_extension(const char *filename) {
     return 0;
 }
 
+static int is_allowed_usb_path(const char *path) {
+    if (!path) return 0;
+    size_t len = strlen(path);
+    if (len < 10) return 0;
+    if (strstr(path, "..")) return 0;
+    if (strncmp(path, "/mnt/usb", 8) != 0) return 0;
+    if (!isdigit((unsigned char)path[8])) return 0;
+    if (path[9] != '/') return 0;
+    return is_supported_extension(path);
+}
+
     static void sha256_transform(SHA256_CTX *ctx, const unsigned char data[]) {
         unsigned int a, b, c, d, e, f, g, h, i, j, t1, t2, m[64];
 
@@ -544,25 +555,6 @@ static int is_supported_extension(const char *filename) {
         return 0;
     }
 
-    static void json_escape(const char *src, char *dst, size_t dst_size) {
-        size_t pos = 0;
-        if (dst_size == 0) {
-            return;
-        }
-
-        for (size_t i = 0; src[i] != '\0' && pos + 1 < dst_size; i++) {
-            unsigned char c = (unsigned char)src[i];
-            if ((c == '"' || c == '\\') && pos + 2 < dst_size) {
-                dst[pos++] = '\\';
-                dst[pos++] = (char)c;
-            } else if (c >= 0x20 && c <= 0x7E) {
-                dst[pos++] = (char)c;
-            }
-        }
-
-        dst[pos] = '\0';
-    }
-
     static int write_payload_details_json(const RepoPayload *item, const char *details_path, const char *install_source, const char *install_source_detail) {
         char name[256], filename[384], url[1400], source[1400], source_direct[1400];
         char description[1400], last_update[128], version[128], checksum[128];
@@ -575,17 +567,17 @@ static int is_supported_extension(const char *filename) {
         localtime_r(&now, &tmv);
         strftime(downloaded_at, sizeof(downloaded_at), "%Y-%m-%dT%H:%M:%S%z", &tmv);
 
-        json_escape(item->name, name, sizeof(name));
-        json_escape(item->filename, filename, sizeof(filename));
-        json_escape(item->url, url, sizeof(url));
-        json_escape(item->source, source, sizeof(source));
-        json_escape(item->source_direct, source_direct, sizeof(source_direct));
-        json_escape(item->description, description, sizeof(description));
-        json_escape(item->last_update, last_update, sizeof(last_update));
-        json_escape(item->version, version, sizeof(version));
-        json_escape(item->checksum, checksum, sizeof(checksum));
-        json_escape(install_source ? install_source : "unknown", i_src, sizeof(i_src));
-        json_escape(install_source_detail ? install_source_detail : "", i_detail, sizeof(i_detail));
+        nm_json_escape(item->name, name, sizeof(name));
+        nm_json_escape(item->filename, filename, sizeof(filename));
+        nm_json_escape(item->url, url, sizeof(url));
+        nm_json_escape(item->source, source, sizeof(source));
+        nm_json_escape(item->source_direct, source_direct, sizeof(source_direct));
+        nm_json_escape(item->description, description, sizeof(description));
+        nm_json_escape(item->last_update, last_update, sizeof(last_update));
+        nm_json_escape(item->version, version, sizeof(version));
+        nm_json_escape(item->checksum, checksum, sizeof(checksum));
+        nm_json_escape(install_source ? install_source : "unknown", i_src, sizeof(i_src));
+        nm_json_escape(install_source_detail ? install_source_detail : "", i_detail, sizeof(i_detail));
 
         snprintf(json_buf, sizeof(json_buf),
                  "{\n"
@@ -850,6 +842,11 @@ static int is_supported_extension(const char *filename) {
         if (!filename) filename = usb_path;
         else filename++;
 
+        if (!is_allowed_usb_path(usb_path)) {
+            snprintf(out_json, out_size, "{\"error\":\"Invalid path\"}");
+            return -1;
+        }
+
         if (compute_sha256_file(usb_path, usb_sha) != 0) {
             snprintf(out_json, out_size, "{\"error\":\"Failed to compute USB SHA256\"}");
             return -1;
@@ -889,6 +886,22 @@ static int is_supported_extension(const char *filename) {
         const char *filename = strrchr(usb_path, '/');
         if (!filename) filename = usb_path;
         else filename++;
+
+        if (!is_allowed_usb_path(usb_path)) {
+            snprintf(out_json, out_size, "{\"error\":\"Invalid path\"}");
+            return -1;
+        }
+
+        if (!overwrite) {
+            char folder_name[128];
+            char final_path[640];
+            nm_utils_get_payload_folder_name(filename, folder_name, sizeof(folder_name));
+            snprintf(final_path, sizeof(final_path), "%s/%s/%s", PAYLOADS_STORAGE_DIR, folder_name, filename);
+            if (access(final_path, F_OK) == 0) {
+                snprintf(out_json, out_size, "{\"error\":\"File exists\"}");
+                return -1;
+            }
+        }
 
         snprintf(temp_path, sizeof(temp_path), "%s/%s.tmp", PAYLOADS_STORAGE_DIR, filename);
 
@@ -1089,11 +1102,15 @@ static int is_supported_extension(const char *filename) {
 
         pos += (size_t)snprintf(json_buf + pos, buf_size - pos,
                                 "{\"payloads\":");
+        if (pos >= buf_size || buf_size - pos <= 64 || cached_size > (buf_size - pos - 64)) {
+            snprintf(json_buf, buf_size,
+                     "{\"payloads\":[],\"last_update\":%ld,\"cache_status\":\"truncated\"}",
+                     last_update);
+            free(cached);
+            return strlen(json_buf);
+        }
         if (pos < buf_size) {
             size_t copy_len = cached_size;
-            if (copy_len > (buf_size - pos - 64)) {
-                copy_len = buf_size - pos - 64;
-            }
             memcpy(json_buf + pos, cached, copy_len);
             pos += copy_len;
         }
