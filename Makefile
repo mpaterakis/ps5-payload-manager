@@ -20,6 +20,10 @@ ELF  := pldmgr.elf
 FRONTEND_DIST := frontend/dist/index.html
 ASSET_HEADER  := include/assets_index_html.h
 CA_HEADER     := include/assets_cacert_pem.h
+MANIFEST_HEADER := include/assets_cache_appcache.h
+FRONTEND_MANIFEST := frontend/dist/cache.appcache
+
+
 
 # Compiler Flags
 CFLAGS := -Os -Wall -ffunction-sections -fdata-sections $(INCLUDES)
@@ -38,11 +42,19 @@ frontend-build:
 	DATE=$$(date -u +"%Y-%m-%d %H:%M UTC"); \
 	TITLE="Payload Manager v$$VERSION by PLK ($$COMMIT, built at $$DATE)"; \
 	echo "Updating title in index.html to: $$TITLE"; \
-	sed -i '' "s/\[\[TITLE_PLACEHOLDER\]\]/$$TITLE/g" frontend/dist/index.html
+	sed -i '' "s/\[\[TITLE_PLACEHOLDER\]\]/$$TITLE/g" frontend/dist/index.html; \
+	echo "Updating build date in cache.appcache to: $$DATE"; \
+	sed -i '' "s/\[\[BUILD_DATE\]\]/$$DATE/g" frontend/dist/cache.appcache
+
+
 
 $(ASSET_HEADER): $(FRONTEND_DIST)
 	@echo "Generating asset header..."
 	$(PYTHON) tools/gen_assets.py $(FRONTEND_DIST) $(ASSET_HEADER) index_html
+
+$(MANIFEST_HEADER): $(FRONTEND_DIST)
+	@echo "Generating Manifest asset header..."
+	$(PYTHON) tools/gen_assets.py $(FRONTEND_MANIFEST) $(MANIFEST_HEADER) cache_appcache
 
 $(CA_HEADER):
 	@echo "Downloading CA bundle..."
@@ -55,14 +67,18 @@ $(FRONTEND_DIST):
 	@echo "Please run 'make frontend-build' locally on your host machine first."
 	@exit 1
 
-$(ELF): $(ASSET_HEADER) $(CA_HEADER) $(SRCS)
+$(ELF): $(ASSET_HEADER) $(MANIFEST_HEADER) $(CA_HEADER) $(SRCS)
 	@echo "Building $(ELF)..."
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(ELF) $(SRCS) $(LIBS)
 	@echo "Stripping $(ELF)..."
 	$(STRIP) $(ELF)
 
 clean:
-	rm -f $(ELF) $(ASSET_HEADER) $(CA_HEADER) src/*.o
+	rm -f $(ELF) $(ASSET_HEADER) $(MANIFEST_HEADER) $(CA_HEADER) src/*.o
+
+
+
+
 
 dist-clean: clean
 	rm -rf frontend/dist

@@ -8,3 +8,15 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+if (window.applicationCache) {
+  window.applicationCache.addEventListener('updateready', () => {
+    if (window.applicationCache.status === window.applicationCache.UPDATEREADY) {
+      window.applicationCache.swapCache();
+      window.location.reload();
+    }
+  }, false);
+}
+
+
+

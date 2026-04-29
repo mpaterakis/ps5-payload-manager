@@ -16,7 +16,11 @@
 #include <unistd.h>
 
 #include "assets_index_html.h"
+#include "assets_cache_appcache.h"
+
 #include "pldmgr.h"
+
+
 #include "payload_mgr.h"
 #include "ps5_launcher.h"
 #include "app_installer.h"
@@ -789,7 +793,17 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
                                            (void *)assets_index_html,
                                            MHD_RESPMEM_PERSISTENT);
     MHD_add_response_header(resp, "Content-Type", "text/html");
+    MHD_add_response_header(resp, "Cache-Control", "public, max-age=31536000");
+  } else if (strcmp(url, ROUTE_CACHE_MANIFEST) == 0) {
+
+    resp = MHD_create_response_from_buffer(assets_cache_appcache_len,
+                                           (void *)assets_cache_appcache,
+                                           MHD_RESPMEM_PERSISTENT);
+    MHD_add_response_header(resp, "Content-Type", "text/cache-manifest");
+    MHD_add_response_header(resp, "Cache-Control", "public, max-age=31536000");
   } else  if (strcmp(url, ROUTE_CHECK) == 0) {
+
+
     const char *filename = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "filename");
     if (!filename) {
       const char *err = "{\"error\":\"Missing filename\"}";

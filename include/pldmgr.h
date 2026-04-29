@@ -28,6 +28,10 @@
 #define ROUTE_REPO_INSTALL_PUSH "/repository_install_push"
 #define ROUTE_USB_MOVE_CHECK "/usb_move_check"
 #define ROUTE_USB_MOVE_PERFORM "/usb_move_perform"
+#define ROUTE_CACHE_MANIFEST "/cache.appcache"
+
+
+
 
 #define MENU_VERSION "1.0.0"
 #define AUTOLOAD_CONFIG_PATH "/data/pldmgr/autoload.txt"

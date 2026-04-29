@@ -48,6 +48,10 @@ function App() {
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null })
   const [moveFromUsbPath, setMoveFromUsbPath] = useState(null)
   const [storageScrollTarget, setStorageScrollTarget] = useState(null)
+  const [isOffline, setIsOffline] = useState(false)
+
+
+
 
   const addToast = (message, type = 'success') => {
     const id = Date.now()
@@ -155,7 +159,7 @@ function App() {
         setConfirmModal({
           show: true,
           title: "Overwrite Payload",
-          message: data.file_exists 
+          message: data.file_exists
             ? `The file ${file.name} already exists. Overwrite it?`
             : `A different version of this payload exists in the "${data.folder_name}" folder. Overwrite it?`,
           onConfirm: () => performUpload(file)
@@ -241,15 +245,35 @@ function App() {
 
   useEffect(() => {
     const init = async () => {
-      const ipRes = await fetch('/getip').then(r => r.text()).catch(() => '0.0.0.0')
-      setIp(ipRes.toLowerCase().includes('<!doctype') ? '192.168.1.133' : ipRes)
-      const verRes = await fetch('/version').then(r => r.text()).catch(() => '?')
-      setVersion(verRes.toLowerCase().includes('<!doctype') ? '1.0.0-dev' : verRes)
-      refreshPayloads()
-      refreshConfig()
+      let offline = false
+      try {
+        const ipRes = await fetch('/getip').then(r => r.text())
+        if (ipRes.toLowerCase().includes('<!doctype')) offline = true
+        else setIp(ipRes)
+      } catch (e) {
+        offline = true
+      }
+
+      try {
+        const verRes = await fetch('/version').then(r => r.text())
+        if (verRes.toLowerCase().includes('<!doctype')) offline = true
+        else setVersion(verRes)
+      } catch (e) {
+        offline = true
+      }
+
+      if (offline) {
+        setIsOffline(true)
+      } else {
+        refreshPayloads()
+        refreshConfig()
+      }
     }
     init()
   }, [])
+
+
+
 
   useEffect(() => {
     if (view === 'autoload' || view === 'storage') {
@@ -281,7 +305,22 @@ function App() {
   }, [])
 
 
+
+  if (isOffline) {
+    return (
+      <div className="min-h-screen ps5-bg text-zinc-100 font-ps5 flex flex-col items-center justify-center p-4 text-center">
+        <div className="max-w-lg p-12 bg-black/40 backdrop-blur-3xl rounded-3xl border border-white/5 shadow-2xl animate-fade-in">
+          <div className="text-7xl font-light text-zinc-400 mb-12 font-mono">:(</div>
+          <h1 className="text-2xl font-bold mb-4 text-zinc-300">Payload Manager is not running...</h1>
+          <p className="text-lg text-zinc-400 leading-relaxed">Please ensure you have loaded <strong>pldmgr.elf</strong> on your PS5 before launching this application.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
+
+
     <div className={cn(
       "min-h-screen min-h-[100dvh] ps5-bg text-zinc-100 font-ps5 flex",
       isPS5 ? "flex-row overflow-hidden" : "flex-col md:flex-row md:overflow-hidden"
@@ -435,22 +474,22 @@ function App() {
           )}
 
           {view === 'storage' && (
-            <StorageHub 
-              payloads={payloads} 
-              onInstall={handleInstall} 
-              onDelete={handleDelete} 
-              onUpload={handleUpload} 
-              onImportFromUsb={handleImportFromUsb} 
-              ip={ip} 
+            <StorageHub
+              payloads={payloads}
+              onInstall={handleInstall}
+              onDelete={handleDelete}
+              onUpload={handleUpload}
+              onImportFromUsb={handleImportFromUsb}
+              ip={ip}
               scrollTarget={storageScrollTarget}
               onClearScrollTarget={() => setStorageScrollTarget(null)}
             />
           )}
 
           {view === 'move_from_usb' && moveFromUsbPath && (
-            <MoveFromUsbView 
-              path={moveFromUsbPath} 
-              onBack={() => setView('storage')} 
+            <MoveFromUsbView
+              path={moveFromUsbPath}
+              onBack={() => setView('storage')}
               onComplete={() => {
                 refreshPayloads()
                 setView('storage')
@@ -461,11 +500,11 @@ function App() {
           )}
 
           {view === 'autoload' && (
-            <AutoloadView 
-              payloads={payloads} 
-              config={config} 
-              onSaveConfig={handleSaveConfig} 
-              onToast={addToast} 
+            <AutoloadView
+              payloads={payloads}
+              config={config}
+              onSaveConfig={handleSaveConfig}
+              onToast={addToast}
               onRedirect={(v) => setView(v)}
             />
           )}
