@@ -33,5 +33,7 @@ export const parsePayloadName = (path) => {
 };
 
 export const isSystemPayload = (filename) => {
-  return filename && (filename.includes('pldmgr.elf') || filename.includes('payload-manager'));
+  if (!filename) return false;
+  const name = filename.split('/').pop().toLowerCase();
+  return name.startsWith('pldmgr') || name.includes('payload-manager');
 };

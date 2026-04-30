@@ -59,7 +59,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
   }, [scrollTarget]);
 
   const localFilenames = useMemo(() => payloads.map(p => p.split('/').pop()), [payloads])
-  const internalPayloads = payloads.filter(p => !p.includes('/mnt/usb') && !isSystemPayload(p))
+  const internalPayloads = payloads.filter(p => !p.includes('/mnt/usb'))
 
   const getBaseName = (filename) => {
     if (!filename) return '';
