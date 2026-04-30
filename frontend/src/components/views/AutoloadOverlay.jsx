@@ -85,7 +85,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish, isPS5 }) => {
                     />
                   </svg>
                   <span className="text-8xl font-bold text-white tabular-nums leading-none">
-                    {(localMs / 1000).toFixed(1)}
+                    {Math.ceil(localMs / 1000)}
                   </span>
                 </div>
                 <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm">Waiting for manual abort...</p>
@@ -116,7 +116,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish, isPS5 }) => {
 
             {isDone && (
               <div className="flex flex-col items-center space-y-8 animate-in zoom-in duration-500">
-                <div className="bg-emerald-500 text-white p-10 rounded-full shadow-[0_0_80px_rgba(16,185,129,0.4)]">
+                <div className="bg-emerald-500 text-white p-10 rounded-full">
                   <CheckCircle2 className="w-20 h-20" />
                 </div>
                 <div className="text-center space-y-2">
@@ -132,7 +132,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish, isPS5 }) => {
             {isDone ? (
               <button
                 onClick={onFinish}
-                className="w-full py-8 bg-ps-blue text-white text-3xl font-extrabold rounded-3xl hover:bg-white hover:text-ps-blue transition-all transform active:scale-95 shadow-[0_0_50px_rgba(0,149,255,0.3)]"
+                className="w-full py-8 bg-ps-blue text-white text-3xl font-extrabold rounded-3xl hover:bg-white hover:text-ps-blue transition-all transform active:scale-95"
               >
                 Return to Dashboard
               </button>
@@ -160,11 +160,11 @@ const AutoloadOverlay = ({ status, onCancel, onFinish, isPS5 }) => {
           <div
             ref={listRef}
             className={cn(
-              "w-full space-y-4 overflow-y-auto custom-scrollbar p-8 bg-white/5 rounded-[2.5rem] border border-white/10 shadow-2xl scroll-smooth",
+              "w-full space-y-4 overflow-y-auto custom-scrollbar p-8 bg-white/5 rounded-[2.5rem] border border-white/10 scroll-smooth",
               isPS5 ? "h-[650px]" : "h-[400px] md:h-[650px]"
             )}
           >
-            <div className="flex items-center justify-between mb-6 px-2 sticky top-0 bg-black/80 backdrop-blur-md py-4 z-10 rounded-2xl border-b border-white/5">
+            <div className="flex items-center justify-between mb-6 px-2 sticky top-0 bg-black/80 py-4 z-10 rounded-2xl border-b border-white/5">
               <h3 className="label-caps !text-white !opacity-100 text-sm tracking-widest flex items-center space-x-3">
                 <span>Payload List</span>
               </h3>
@@ -183,7 +183,7 @@ const AutoloadOverlay = ({ status, onCancel, onFinish, isPS5 }) => {
                     data-active={active}
                     className={cn(
                       "flex items-center justify-between p-5 rounded-2xl border transition-all duration-500",
-                      active ? 'bg-ps-blue/20 border-ps-blue shadow-[0_0_40px_rgba(0,149,255,0.15)] scale-[1.02] z-10' :
+                      active ? 'bg-ps-blue/20 border-ps-blue scale-[1.02] z-10' :
                         done ? 'bg-emerald-500/5 border-emerald-500/20 opacity-90' : 'bg-white/5 border-white/10 opacity-40'
                     )}>
                     <div className="flex items-center space-x-5">

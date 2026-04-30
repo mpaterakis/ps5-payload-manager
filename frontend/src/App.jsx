@@ -294,7 +294,7 @@ function App() {
           // Poll as long as countdown is active OR sequence is executing (not yet DONE)
           const isActive = data && (data.remaining >= 0 && data.current !== 'DONE')
           if (isActive) {
-            const delay = data.remaining > 0 ? 200 : 500
+            const delay = data.remaining > 0 ? 600 : 500
             statusTimeout = setTimeout(poll, delay)
           }
           return
@@ -311,7 +311,7 @@ function App() {
   if (isOffline) {
     return (
       <div className="min-h-screen ps5-bg text-zinc-100 font-ps5 flex flex-col items-center justify-center p-4 text-center">
-        <div className="max-w-lg p-12 bg-black/40 backdrop-blur-3xl rounded-3xl border border-white/5 shadow-2xl animate-fade-in">
+        <div className="max-w-lg p-12 bg-black/40 rounded-3xl border border-white/5">
           <div className="text-7xl font-light text-zinc-400 mb-12 font-mono">:(</div>
           <h1 className="text-2xl font-bold mb-4 text-zinc-300">Payload Manager is not running...</h1>
           <p className="text-lg text-zinc-400 leading-relaxed">Please ensure you have loaded <strong>pldmgr.elf</strong> on your PS5 before launching this application.</p>
@@ -342,7 +342,7 @@ function App() {
             <span className="text-white font-bold text-xl">{downloadModal.progress}%</span>
           </div>
           <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/10 p-0.5">
-            <div className="h-full bg-ps-blue rounded-full transition-all duration-500 shadow-[0_0_20px_rgba(0,112,209,0.5)]" style={{ width: `${downloadModal.progress}%` }} />
+            <div className="h-full bg-ps-blue rounded-full transition-all duration-500" style={{ width: `${downloadModal.progress}%` }} />
           </div>
         </div>
       </Modal>
@@ -354,7 +354,7 @@ function App() {
         footer={
           <>
             <button onClick={() => setConfirmModal({ show: false })} className="flex-1 px-8 py-5 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all uppercase tracking-tight">Cancel</button>
-            <button onClick={confirmModal.onConfirm} className="flex-1 px-8 py-5 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold transition-all uppercase tracking-tight shadow-xl shadow-red-900/20">Confirm</button>
+            <button onClick={confirmModal.onConfirm} className="flex-1 px-8 py-5 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold transition-all uppercase tracking-tight">Confirm</button>
           </>
         }
       >
@@ -365,9 +365,8 @@ function App() {
         <AutoloadOverlay status={autoloadStatus} onCancel={handleAbort} onFinish={handleFinish} isPS5={isPS5} />
       )}
 
-      {/* DESKTOP SIDEBAR */}
       <aside className={cn(
-        "flex-col bg-black/40 backdrop-blur-3xl border-r border-white/5 transition-all duration-500 z-[100] h-screen shadow-[10px_0_30px_rgba(0,0,0,0.5)]",
+        "flex-col bg-black/40 border-r border-white/5 transition-all duration-500 z-[100] h-screen",
         isPS5 ? "flex" : "hidden md:flex",
         sidebarExpanded ? "w-80" : "w-24"
       )}>
@@ -380,7 +379,7 @@ function App() {
               <Menu className="w-6 h-6" />
             </button>
             <div className={cn("flex items-center space-x-3 transition-all duration-500", sidebarExpanded ? "opacity-100 scale-100" : "opacity-0 scale-90 absolute pointer-events-none")}>
-              <div className="p-2 bg-ps-blue rounded-xl shadow-[0_0_20px_rgba(0,112,209,0.3)]">
+              <div className="p-2 bg-ps-blue rounded-xl">
                 <LogoIcon className="w-6 h-6 text-white" />
               </div>
               <span className="text-2xl font-bold tracking-tight text-white">PLDMGR</span>
@@ -402,7 +401,7 @@ function App() {
               onClick={() => setView('donate')}
               icon={Heart}
               label="Donate"
-              className={view === 'donate' ? "bg-red-600 shadow-[0_0_20px_rgba(220,38,38,0.3)]" : "text-red-500 hover:bg-red-600/10"}
+              className={view === 'donate' ? "bg-red-600" : "text-red-500 hover:bg-red-600/10"}
             />
           </div>
         </div>
@@ -410,7 +409,7 @@ function App() {
 
       {/* MOBILE BOTTOM NAV */}
       <nav className={cn(
-        "fixed bottom-0 inset-x-0 z-[100] bg-black/80 backdrop-blur-2xl border-t border-white/5 h-[calc(5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] flex items-center shadow-[0_-10px_30px_rgba(0,0,0,0.5)]",
+        "fixed bottom-0 inset-x-0 z-[100] bg-black/80 border-t border-white/5 h-[calc(5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] flex items-center",
         isPS5 ? "hidden" : "md:hidden"
       )}>
         <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={LayoutDashboard} label="Dashboard" mobileLabel="HOME" />
@@ -447,7 +446,7 @@ function App() {
               )}>
                 {loadingPayloads ? (
                   Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="glass-card p-6 rounded-ps-xl flex flex-col space-y-2 border-white/5 animate-pulse">
+                    <div key={i} className="glass-card p-6 rounded-ps-xl flex flex-col space-y-2 border-white/5">
                       <div className="h-7 w-40 bg-white/5 rounded-lg" />
                       <div className="h-3 w-20 bg-white/5 rounded-md opacity-50" />
                     </div>
@@ -459,7 +458,7 @@ function App() {
                       <p className="text-white font-extrabold tracking-tight text-2xl">Empty Library</p>
                       <p className="text-zinc-500 font-medium">Add payloads from the Cloud Hub to get started.</p>
                     </div>
-                    <button onClick={() => { setStorageScrollTarget('cloud-repository'); setView('storage'); }} className="px-8 py-3 bg-ps-blue text-white rounded-xl font-bold tracking-tight shadow-xl shadow-ps-blue/20">Open Repository</button>
+                    <button onClick={() => { setStorageScrollTarget('cloud-repository'); setView('storage'); }} className="px-8 py-3 bg-ps-blue text-white rounded-xl font-bold tracking-tight">Open Repository</button>
                   </div>
                 ) : (
                   payloads.filter(p => !isSystemPayload(p)).map((p, i) => (

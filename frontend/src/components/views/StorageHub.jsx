@@ -88,14 +88,14 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
   const cloudItems = remoteStatus.filter(p => !p.isInstalled || p.isUpdate);
 
   return (
-    <div className="space-y-12 animate-fade-in">
+    <div className="space-y-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <h2 className="text-4xl font-extrabold text-white tracking-tight">
           Payload <span className="text-ps-blue">Management</span>
         </h2>
 
         {!isPS5 && (
-          <label className="inline-flex items-center space-x-4 px-10 py-5 bg-ps-blue hover:bg-ps-blue/80 text-white rounded-[1.25rem] font-bold tracking-tight text-xl cursor-pointer transition-all shadow-2xl shadow-ps-blue/20 shrink-0 transform active:scale-95">
+          <label className="inline-flex items-center space-x-4 px-10 py-5 bg-ps-blue hover:bg-ps-blue/80 text-white rounded-[1.25rem] font-bold tracking-tight text-xl cursor-pointer transition-all shrink-0 transform active:scale-95">
             <Upload className="w-7 h-7" />
             <span>Upload ELF Payload</span>
             <input type="file" className="hidden" onChange={onUpload} accept=".elf,.bin,.lua" />
@@ -142,15 +142,15 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
                     {remoteMatch?.isUpdate && (
                       <button
                         onClick={() => onInstall(remoteMatch, repoUrl)}
-                        className="flex items-center space-x-2 md:space-x-3 px-4 md:px-6 py-2 md:py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs md:text-sm transition-all shadow-xl shadow-emerald-900/20"
+                        className="flex items-center space-x-2 md:space-x-3 px-4 md:px-6 py-2 md:py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs md:text-sm transition-all"
                       >
-                        <RefreshCw className="w-4 h-4 md:w-5 md:h-5 animate-spin-slow" />
+                        <RefreshCw className="w-4 h-4 md:w-5 md:h-5" />
                         <span>Update</span>
                       </button>
                     )}
                     <button
                       onClick={() => onDelete(fileName)}
-                      className="p-3 md:p-4 rounded-xl bg-red-950/20 text-red-500 border border-red-500/10 hover:bg-red-500 hover:text-white transition-all shadow-xl"
+                      className="p-3 md:p-4 rounded-xl bg-red-950/20 text-red-500 border border-red-500/10 hover:bg-red-500 hover:text-white transition-all"
                       title="Remove Payload"
                     >
                       <Trash2 className="w-5 h-5 md:w-6 md:h-6" />
@@ -183,7 +183,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
         {loading && remotePayloads.length === 0 ? (
           <div className="py-24 glass-panel rounded-ps-3xl border-white/5 flex flex-col items-center justify-center space-y-6">
             <Loader2 className="w-16 h-16 text-ps-blue animate-spin" />
-            <p className="label-caps animate-pulse">Syncing with Repository...</p>
+            <p className="label-caps">Syncing with Repository...</p>
           </div>
         ) : error ? (
           <div className="py-20 glass-card rounded-ps-3xl border-red-500/20 flex flex-col items-center justify-center space-y-6 bg-red-950/5">
@@ -216,9 +216,9 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
                   <button
                     onClick={() => onInstall(p, repoUrl)}
                     className={cn(
-                      "flex items-center justify-center space-x-3 md:space-x-4 px-6 md:px-8 py-3 md:py-5 rounded-2xl font-bold text-lg md:text-xl transition-all shadow-2xl shrink-0 transform active:scale-95",
+                      "flex items-center justify-center space-x-3 md:space-x-4 px-6 md:px-8 py-3 md:py-5 rounded-2xl font-bold text-lg md:text-xl transition-all shrink-0 transform active:scale-95",
                       isPS5 ? "w-auto px-12" : "w-full md:w-auto",
-                      p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20" : "bg-ps-blue hover:bg-ps-blue/80 text-white shadow-ps-blue/20"
+                      p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
                     )}
                   >
                     <CloudDownload className="w-5 h-5 md:w-7 md:h-7" />
@@ -284,7 +284,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
                   <div className="flex items-center ml-auto md:ml-0">
                     <button
                       onClick={() => onImportFromUsb(path)}
-                      className="flex items-center space-x-2 md:space-x-3 px-4 md:px-6 py-3 md:py-4 bg-white/5 hover:bg-ps-blue text-white rounded-xl font-bold text-xs md:text-sm transition-all border border-white/10 hover:border-ps-blue shadow-xl group/btn"
+                      className="flex items-center space-x-2 md:space-x-3 px-4 md:px-6 py-3 md:py-4 bg-white/5 hover:bg-ps-blue text-white rounded-xl font-bold text-xs md:text-sm transition-all border border-white/10 hover:border-ps-blue group/btn"
                     >
                       <Database className="w-4 h-4 md:w-5 md:h-5 text-ps-blue group-hover/btn:text-white transition-colors" />
                       <span>Move to Internal</span>
@@ -304,7 +304,7 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
           isPS5 ? "flex-row" : "flex-col md:flex-row"
         )}>
           <div className="flex flex-col items-center space-y-4 md:space-y-6 shrink-0">
-            <div className="bg-white p-4 md:p-6 rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)]">
+            <div className="bg-white p-4 md:p-6 rounded-3xl">
               <QRCodeSVG value={`http://${ip}:8084`} size={isPS5 ? 160 : 120} level="M" />
             </div>
             <code className="text-white font-mono text-base md:text-lg font-black opacity-90 italic tracking-tight uppercase">{ip}:8084</code>

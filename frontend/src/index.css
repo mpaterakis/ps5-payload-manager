@@ -46,9 +46,9 @@ body {
 
 .ps5-bg {
   background-color: var(--color-ps-black);
-  background-image: 
+  /* background-image: 
     radial-gradient(circle at 0% 0%, rgba(0, 149, 255, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 100% 100%, rgba(0, 149, 255, 0.03) 0%, transparent 50%);
+    radial-gradient(circle at 100% 100%, rgba(0, 149, 255, 0.03) 0%, transparent 50%); */
 }
 
 /* Custom Scrollbar */
@@ -74,21 +74,21 @@ body {
 .glass-panel {
   background: var(--color-ps-surface);
   border-right: 1px solid var(--color-ps-border);
-  backdrop-filter: blur(12px);
+/* backdrop-filter: blur(12px); */
 }
 
 .glass-card {
   background: var(--color-ps-card);
   border: 1px solid var(--color-ps-border);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+/* box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5); */
 }
 
 .glass-card:hover, .glass-card:focus {
   background: rgba(40, 40, 45, 0.95);
   border-color: var(--color-ps-blue);
   transform: translateY(-2px);
-  box-shadow: 0 0 30px var(--color-ps-blue-glow);
+/* box-shadow: 0 0 30px var(--color-ps-blue-glow); */
   outline: none;
 }
 
@@ -99,11 +99,11 @@ button:focus {
 
 /* Neon Glows */
 .neon-text {
-  text-shadow: 0 0 10px var(--color-ps-blue-glow);
+/* text-shadow: 0 0 10px var(--color-ps-blue-glow); */
 }
 
 .neon-border {
-  box-shadow: 0 0 15px var(--color-ps-blue-glow);
+/* box-shadow: 0 0 15px var(--color-ps-blue-glow); */
 }
 
 /* Typography */
@@ -137,12 +137,12 @@ h1, h2, h3, h4 {
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+  /* animation: fadeIn 0.4s ease-out forwards; */
 }
 
 .animate-spin {
-  animation: spin 1s linear infinite;
-  -webkit-animation: spin 1s linear infinite;
+  /* animation: spin 1s linear infinite;
+  -webkit-animation: spin 1s linear infinite; */
   transform-origin: center;
   -webkit-transform-origin: center;
   will-change: transform;

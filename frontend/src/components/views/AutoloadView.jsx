@@ -97,7 +97,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast, onRedirect }) =
   }
 
   const renderAvailable = () => (
-    <div className="space-y-8 animate-fade-in flex flex-col h-full min-h-0">
+    <div className="space-y-8 flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-4">
           {subView === 'add' && (
@@ -160,7 +160,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast, onRedirect }) =
   )
 
   const renderSequence = () => (
-    <div className="space-y-8 animate-fade-in flex flex-col h-full min-h-0">
+    <div className="space-y-8 flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex flex-col">
           <h2 className="text-4xl font-extrabold text-white tracking-tight">
@@ -168,7 +168,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast, onRedirect }) =
           </h2>
           <div className="h-6 mt-1 overflow-hidden">
             {saving ? (
-              <div className="flex items-center space-x-2 text-ps-blue/60 text-xs font-bold uppercase tracking-widest animate-pulse">
+              <div className="flex items-center space-x-2 text-ps-blue/60 text-xs font-bold uppercase tracking-widest">
                 <RefreshCw className="w-3 h-3 animate-spin" />
                 <span>Saving Changes...</span>
               </div>
@@ -234,9 +234,9 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast, onRedirect }) =
 
   if (!enabled) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center space-y-8 animate-fade-in text-center p-6 md:p-12">
+      <div className="flex-1 flex flex-col items-center justify-center space-y-8 text-center p-6 md:p-12">
         <div className="relative h-24 w-24 md:h-32 md:w-32 mx-auto">
-          <div className="absolute inset-0 bg-ps-blue/20 blur-3xl rounded-full animate-pulse" />
+          <div className="absolute inset-0 bg-ps-blue/20 rounded-full" />
           <div className="relative flex items-center justify-center h-full w-full bg-black/40 border border-white/10 rounded-3xl md:rounded-[2.5rem] shadow-2xl">
             <RefreshCw className="w-10 h-10 md:w-16 md:h-16 text-ps-blue" />
           </div>
@@ -261,7 +261,7 @@ const AutoloadView = ({ payloads, config, onSaveConfig, onToast, onRedirect }) =
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex-1 flex flex-col animate-fade-in min-h-0">
+      <div className="flex-1 flex flex-col min-h-0">
         <div className={cn(
           "gap-12 h-full min-h-0",
           isPS5 ? "grid grid-cols-2" : "hidden lg:grid lg:grid-cols-2"
