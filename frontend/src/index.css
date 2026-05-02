@@ -1,6 +1,29 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme {
+/** 
+ * LEGACY FALLBACKS
+ * These ensure basic functionality on PS5 firmware < 5.0 (Safari < 15.4)
+ * which does not support CSS Cascading Layers (@layer).
+ */
+.hidden { display: none !important; }
+.flex { display: flex !important; }
+.flex-col { flex-direction: column !important; }
+.items-center { align-items: center !important; }
+.justify-center { justify-content: center !important; }
+.ps5-bg { background-color: var(--color-ps-black) !important; }
+.text-white { color: #ffffff !important; }
+.text-zinc-100 { color: #f4f4f5 !important; }
+.text-zinc-300 { color: #d4d4d8 !important; }
+.text-zinc-400 { color: #a1a1aa !important; }
+.text-ps-blue { color: #0095ff !important; }
+@media (min-width: 768px) {
+  .md\:hidden { display: none !important; }
+  .md\:flex { display: flex !important; }
+}
+
+:root {
   --color-ps-blue: #0095ff;
   --color-ps-blue-glow: rgba(0, 149, 255, 0.4);
   --color-ps-black: #08080a;
@@ -13,6 +36,10 @@
   --radius-ps-xl: 1rem;
   --radius-ps-2xl: 1.5rem;
   --radius-ps-3xl: 2rem;
+}
+
+@theme {
+  /* Removed - using tailwind.config.js */
 }
 
 :root {
