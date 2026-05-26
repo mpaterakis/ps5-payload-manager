@@ -17,6 +17,8 @@
 
 #include "assets_index_html.h"
 #include "assets_cache_appcache.h"
+#include "assets_favicon_svg.h"
+#include "assets_icon_png.h"
 
 #include "pldmgr.h"
 
@@ -720,9 +722,10 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     }
   }
 
-  /* Only log significant requests, not pollers like /log */
+  /* Only log significant requests, not pollers like /log or static assets */
   if (strcmp(url, ROUTE_LOG) != 0 && strcmp(url, ROUTE_INDEX) != 0 &&
-      strcmp(url, ROUTE_INDEX_HTML) != 0) {
+      strcmp(url, ROUTE_INDEX_HTML) != 0 && strcmp(url, "/favicon.svg") != 0 &&
+      strcmp(url, "/icon.png") != 0) {
     pldmgr_log("[PLDMGR] Request: %s %s\n", method, url);
   }
 
@@ -801,6 +804,18 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
                                            MHD_RESPMEM_PERSISTENT);
     MHD_add_response_header(resp, "Content-Type", "text/cache-manifest");
     MHD_add_response_header(resp, "Cache-Control", "no-cache, must-revalidate");
+  } else if (strcmp(url, "/favicon.svg") == 0) {
+    resp = MHD_create_response_from_buffer(assets_favicon_svg_len,
+                                           (void *)assets_favicon_svg,
+                                           MHD_RESPMEM_PERSISTENT);
+    MHD_add_response_header(resp, "Content-Type", "image/svg+xml");
+    MHD_add_response_header(resp, "Cache-Control", "max-age=604800");
+  } else if (strcmp(url, "/icon.png") == 0) {
+    resp = MHD_create_response_from_buffer(assets_icon_png_len,
+                                           (void *)assets_icon_png,
+                                           MHD_RESPMEM_PERSISTENT);
+    MHD_add_response_header(resp, "Content-Type", "image/png");
+    MHD_add_response_header(resp, "Cache-Control", "max-age=604800");
   } else  if (strcmp(url, ROUTE_CHECK) == 0) {
 
 

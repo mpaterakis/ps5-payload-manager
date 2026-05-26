@@ -4,9 +4,7 @@
 *.o
 
 # Generated Asset Headers
-include/assets_index_html.h
-include/assets_cache_appcache.h
-include/assets_cacert_pem.h
+include/assets_*.h
 
 # Frontend build artifacts
 frontend/dist/
