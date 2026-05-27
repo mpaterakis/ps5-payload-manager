@@ -870,7 +870,7 @@ static int is_allowed_usb_path(const char *path) {
             for (int i = 0; i < 8; i++) {
                 char usb_root[32];
                 snprintf(usb_root, sizeof(usb_root), "/mnt/usb%d", i);
-                scan_payloads_recursive(usb_root, 0, 1, &jb);
+                scan_payloads_recursive(usb_root, 0, 0, &jb);
             }
         }
 
