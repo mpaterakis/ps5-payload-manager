@@ -8,10 +8,13 @@
 #include <arpa/inet.h>
 #include <microhttpd.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
+#include <sys/sysctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -45,6 +48,46 @@ static int log_updated = 0;
 static volatile sig_atomic_t resume_flag = 0;
 
 void handle_sigcont(int sig) { resume_flag = 1; }
+
+static pid_t
+find_pid(const char* name) {
+  int mib[4] = {1, 14, 8, 0};
+  pid_t mypid = getpid();
+  pid_t pid = -1;
+  size_t buf_size;
+  uint8_t *buf;
+
+  if(sysctl(mib, 4, 0, &buf_size, 0, 0)) {
+    pldmgr_log("[PLDMGR] sysctl failed\n");
+    return -1;
+  }
+
+  if(!(buf=malloc(buf_size))) {
+    pldmgr_log("[PLDMGR] malloc failed\n");
+    return -1;
+  }
+
+  if(sysctl(mib, 4, buf, &buf_size, 0, 0)) {
+    pldmgr_log("[PLDMGR] sysctl failed\n");
+    free(buf);
+    return -1;
+  }
+
+  for(uint8_t *ptr=buf; ptr<(buf+buf_size);) {
+    int ki_structsize = *(int*)ptr;
+    pid_t ki_pid = *(pid_t*)&ptr[72];
+    char *ki_tdname = (char*)&ptr[447];
+
+    ptr += ki_structsize;
+    if(!strcmp(name, ki_tdname) && ki_pid != mypid) {
+      pid = ki_pid;
+    }
+  }
+
+  free(buf);
+
+  return pid;
+}
 
 void pldmgr_log(const char *fmt, ...) {
   char line[MAX_LOG_LINE_LEN];
@@ -731,6 +774,7 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
 
   struct MHD_Response *resp = NULL;
   enum MHD_Result ret;
+  int http_status = MHD_HTTP_OK;
 
   if (strcmp(url, ROUTE_USB_MOVE_CHECK) == 0) {
     const char *path = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "path");
@@ -922,9 +966,11 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     }
 
     if (!final_path) {
+      pldmgr_log("[PLDMGR] !!! Payload path rejected: %s\n", path);
       const char *err = "Invalid payload name\n";
       resp = MHD_create_response_from_buffer(strlen(err), (void *)err,
                                              MHD_RESPMEM_PERSISTENT);
+      http_status = MHD_HTTP_BAD_REQUEST;
     } else if (ps5_launch_elf(final_path) == 0) {
       resp = MHD_create_response_from_buffer(strlen(MSG_OK), (void *)MSG_OK,
                                              MHD_RESPMEM_PERSISTENT);
@@ -932,6 +978,7 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
       const char *err = "Failed to launch payload\n";
       resp = MHD_create_response_from_buffer(strlen(err), (void *)err,
                                              MHD_RESPMEM_PERSISTENT);
+      http_status = MHD_HTTP_INTERNAL_SERVER_ERROR;
     }
     MHD_add_response_header(resp, "Content-Type", "text/plain");
   } else if (strncmp(url, ROUTE_DELETE, strlen(ROUTE_DELETE)) == 0) {
@@ -1134,7 +1181,7 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
   /* Add CORS headers */
   add_cors_headers(resp);
 
-  ret = MHD_queue_response(conn, MHD_HTTP_OK, resp);
+  ret = MHD_queue_response(conn, http_status, resp);
   MHD_destroy_response(resp);
 
   return ret;
@@ -1149,6 +1196,18 @@ __attribute__((used)) volatile const char pldmgr_version_sig[] = "PLDMGR_VER:" M
 int main(int argc, char *argv[]) {
   struct MHD_Daemon *daemon;
   unsigned short port = DEFAULT_PORT;
+  pid_t pid;
+
+  syscall(SYS_thr_set_name, -1, "pldmgr.elf");
+
+  while((pid=find_pid("pldmgr.elf")) > 0) {
+    if(kill(pid, SIGKILL)) {
+      pldmgr_log("[PLDMGR] kill failed\n");
+      return EXIT_FAILURE;
+    }
+    sleep(1);
+  }
+
   pldmgr_log("[PLDMGR] Starting Payload Manager v%s on port %d...\n", pldmgr_version_sig + 11,
          port);
 
