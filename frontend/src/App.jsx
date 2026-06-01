@@ -365,7 +365,7 @@ function App() {
       </div>
 
       {/* Modals */}
-      <Modal show={downloadModal.show} title="Processing Payload" onClose={() => { }}>
+      <Modal show={downloadModal.show} title="Installing Payload" onClose={() => { }}>
         <div className="space-y-6">
           <div className="flex justify-between items-end">
             <span className="text-ps-blue font-black uppercase italic tracking-tighter text-2xl">{downloadModal.name}</span>
