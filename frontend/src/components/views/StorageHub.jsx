@@ -152,7 +152,7 @@ const StorageHub = ({ payloads, payloadMeta, onInstall, onDelete, onUpload, onIm
               const remoteMatch = allRemote.find(rp => rp.filename === fileName || rp.installedFilename === fileName)
               const remoteVersion = remoteMatch?.filename ? parsePayloadName(remoteMatch.filename).version : null
               return (
-                <div key={path} className="group flex flex-col p-4 md:p-6 glass-card rounded-ps-2xl border-white/10 hover:border-ps-blue/30 gap-3 md:gap-4 relative overflow-hidden">
+                <div key={path} className="group flex flex-col justify-center p-4 md:p-6 glass-card rounded-ps-2xl border-white/10 hover:border-ps-blue/30 gap-3 md:gap-4 relative overflow-hidden">
                   <div className="flex flex-row items-center justify-between w-full gap-4">
                     <div className="flex items-center space-x-4 md:space-x-6 min-w-0 flex-1">
                       <div className="p-3 md:p-4 bg-white/5 rounded-2xl group-hover:bg-ps-blue/10 transition-colors shrink-0">
@@ -227,7 +227,7 @@ const StorageHub = ({ payloads, payloadMeta, onInstall, onDelete, onUpload, onIm
               const availablePayloads = src.payloads.filter(p => !p.isInstalled || p.isUpdate)
               const isExpanded = expandedSource === src.id
               return (
-                <div key={src.id} className="glass-card rounded-ps-3xl border border-white/10 overflow-hidden">
+                <div key={src.id} className="bg-ps-card border border-ps-border rounded-ps-3xl overflow-hidden">
                   {/* Catalog header */}
                   <button
                     onClick={() => setExpandedSource(isExpanded ? null : src.id)}
@@ -272,7 +272,7 @@ const StorageHub = ({ payloads, payloadMeta, onInstall, onDelete, onUpload, onIm
                           <div
                             key={p.filename}
                             className={cn(
-                              "flex flex-col md:flex-row justify-between gap-4 md:gap-8 p-6 md:p-8 hover:bg-white/[0.02] transition-colors",
+                              "flex flex-col md:flex-row justify-between gap-4 md:gap-8 p-6 md:p-8 hover:bg-white/[0.03] transition-colors",
                               isPS5 ? "flex-row items-center" : "items-start md:items-center"
                             )}
                           >
