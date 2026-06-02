@@ -272,7 +272,8 @@ struct UploadStatus {
 
 static void read_next_config_values(int *enabled, long *repo_update,
                                     int *browser_open, int *auto_delay,
-                                    int *kill_disc_player, int *scan_usb, int *auto_install_app) {
+                                    int *kill_disc_player, int *scan_usb, int *auto_install_app,
+                                    int *multi_sources) {
   FILE *f = fopen(PLDMGR_CONFIG_PATH, "r");
   char line[256];
 
@@ -283,6 +284,7 @@ static void read_next_config_values(int *enabled, long *repo_update,
   *kill_disc_player = 1; /* Default on */
   *scan_usb = 0;         /* Default off */
   *auto_install_app = 1; /* Default on */
+  *multi_sources = 0;    /* Default off */
 
   if (!f) {
     return;
@@ -303,6 +305,8 @@ static void read_next_config_values(int *enabled, long *repo_update,
       *scan_usb = atoi(line + 18);
     } else if (strncmp(line, "AUTO_INSTALL_APP=", 17) == 0) {
       *auto_install_app = atoi(line + 17);
+    } else if (strncmp(line, "MULTI_SOURCES_ENABLED=", 22) == 0) {
+      *multi_sources = atoi(line + 22);
     }
   }
   fclose(f);
@@ -310,7 +314,8 @@ static void read_next_config_values(int *enabled, long *repo_update,
 
 static int write_next_config_values(int enabled, long repo_update,
                                     int browser_open, int auto_delay,
-                                    int kill_disc_player, int scan_usb, int auto_install_app) {
+                                    int kill_disc_player, int scan_usb, int auto_install_app,
+                                    int multi_sources) {
   FILE *f;
 
   mkdir(BASE_DATA_DIR, 0777);
@@ -326,6 +331,7 @@ static int write_next_config_values(int enabled, long repo_update,
   fprintf(f, "KILL_DISC_PLAYER_ON_STARTUP=%d\n", kill_disc_player ? 1 : 0);
   fprintf(f, "SCAN_USB_PAYLOADS=%d\n", scan_usb ? 1 : 0);
   fprintf(f, "AUTO_INSTALL_APP=%d\n", auto_install_app ? 1 : 0);
+  fprintf(f, "MULTI_SOURCES_ENABLED=%d\n", multi_sources ? 1 : 0);
   fclose(f);
   return 0;
 }
@@ -399,6 +405,15 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     }
 
     if (strcmp(url, ROUTE_REPO_PUSH) == 0 && strcmp(method, "POST") == 0) {
+      struct PostStatus *status = malloc(sizeof(struct PostStatus));
+      status->data = NULL;
+      status->size = 0;
+      status->error = 0;
+      *con_cls = status;
+      return MHD_YES;
+    }
+
+    if (strcmp(url, ROUTE_SOURCES_SET) == 0 && strcmp(method, "POST") == 0) {
       struct PostStatus *status = malloc(sizeof(struct PostStatus));
       status->data = NULL;
       status->size = 0;
@@ -495,9 +510,9 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
         }
 
         if (enabled != -1) {
-          int ex_en, ex_br, ex_del, ex_kill, ex_usb, ex_install;
+          int ex_en, ex_br, ex_del, ex_kill, ex_usb, ex_install, ex_multi;
           long ex_repo;
-          read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del, &ex_kill, &ex_usb, &ex_install);
+          read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del, &ex_kill, &ex_usb, &ex_install, &ex_multi);
 
           /* Update individual fields from JSON if present */
           int browser_open = ex_br;
@@ -573,8 +588,23 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
             }
           }
 
+          int multi_sources = ex_multi;
+          char *multi_pos = strstr(status->data, "\"MULTI_SOURCES_ENABLED\"");
+          if (multi_pos) {
+            char *val = strchr(multi_pos, ':');
+            if (val) {
+              val++;
+              while (*val == ' ')
+                val++;
+              if (strncmp(val, "true", 4) == 0)
+                multi_sources = 1;
+              else if (strncmp(val, "false", 5) == 0)
+                multi_sources = 0;
+            }
+          }
+
           if (write_next_config_values(enabled, ex_repo, browser_open,
-                                       auto_delay, kill_disc, scan_usb, auto_install) == 0) {
+                                       auto_delay, kill_disc, scan_usb, auto_install, multi_sources) == 0) {
             pldmgr_log("[PLDMGR] Saved config to %s\n", PLDMGR_CONFIG_PATH);
           }
           if (enabled == 0)
@@ -672,6 +702,41 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
           conn, ok == 0 ? MHD_HTTP_OK : MHD_HTTP_BAD_REQUEST, resp);
       MHD_destroy_response(resp);
       return ret2;
+    }
+  }
+
+  /* Handle POST data for /sources_set */
+  if (strcmp(url, ROUTE_SOURCES_SET) == 0 && strcmp(method, "POST") == 0) {
+    struct PostStatus *status = (struct PostStatus *)*con_cls;
+    if (*upload_data_size != 0) {
+      char *nd = realloc(status->data, status->size + *upload_data_size + 1);
+      if (!nd) {
+        status->error = 1;
+      } else {
+        status->data = nd;
+        memcpy(status->data + status->size, upload_data, *upload_data_size);
+        status->size += *upload_data_size;
+        status->data[status->size] = '\0';
+      }
+      *upload_data_size = 0;
+      return MHD_YES;
+    } else {
+      int ok = -1;
+      if (status->data && !status->error)
+        ok = payload_mgr_sources_save(status->data, status->size);
+      if (status->data)
+        free(status->data);
+      free(status);
+      *con_cls = NULL;
+
+      const char *msg = ok == 0 ? MSG_OK : "Failed to save sources";
+      struct MHD_Response *resp_ss = MHD_create_response_from_buffer(
+          strlen(msg), (void *)msg, MHD_RESPMEM_MUST_COPY);
+      add_cors_headers(resp_ss);
+      enum MHD_Result ret_ss = MHD_queue_response(
+          conn, ok == 0 ? MHD_HTTP_OK : MHD_HTTP_INTERNAL_SERVER_ERROR, resp_ss);
+      MHD_destroy_response(resp_ss);
+      return ret_ss;
     }
   }
 
@@ -911,8 +976,14 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     struct MHD_Response *oom_resp = alloc_response_buffer(&resp_buf);
     if (oom_resp)
       return MHD_queue_response(conn, MHD_HTTP_INTERNAL_SERVER_ERROR, oom_resp);
-    size_t len = payload_mgr_repository_list_json(resp_buf,
-                                                  RESPONSE_BUFFER_SIZE, 0);
+    int multi_en = 0, _a, _b, _c, _d, _e, _f;
+    long _g;
+    read_next_config_values(&_a, &_g, &_b, &_c, &_d, &_e, &_f, &multi_en);
+    size_t len;
+    if (multi_en)
+      len = payload_mgr_multi_repository_list_json(resp_buf, RESPONSE_BUFFER_SIZE, 0);
+    else
+      len = payload_mgr_repository_list_json(resp_buf, RESPONSE_BUFFER_SIZE, 0);
     resp = MHD_create_response_from_buffer(len, (void *)resp_buf,
                                            MHD_RESPMEM_MUST_FREE);
     MHD_add_response_header(resp, "Content-Type", "application/json");
@@ -921,14 +992,21 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     struct MHD_Response *oom_resp = alloc_response_buffer(&resp_buf);
     if (oom_resp)
       return MHD_queue_response(conn, MHD_HTTP_INTERNAL_SERVER_ERROR, oom_resp);
-    size_t len = payload_mgr_repository_list_json(resp_buf,
-                                                  RESPONSE_BUFFER_SIZE, 1);
-    resp = MHD_create_response_from_buffer(len, (void *)resp_buf,
+    int multi_en2 = 0, _a2, _b2, _c2, _d2, _e2, _f2;
+    long _g2;
+    read_next_config_values(&_a2, &_g2, &_b2, &_c2, &_d2, &_e2, &_f2, &multi_en2);
+    size_t len2;
+    if (multi_en2)
+      len2 = payload_mgr_multi_repository_list_json(resp_buf, RESPONSE_BUFFER_SIZE, 1);
+    else
+      len2 = payload_mgr_repository_list_json(resp_buf, RESPONSE_BUFFER_SIZE, 1);
+    resp = MHD_create_response_from_buffer(len2, (void *)resp_buf,
                                            MHD_RESPMEM_MUST_FREE);
     MHD_add_response_header(resp, "Content-Type", "application/json");
   } else if (strcmp(url, ROUTE_REPO_INSTALL) == 0) {
     const char *filename = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "filename");
     const char *repo_url = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "repo_url");
+    const char *source_id = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "source_id");
     if (!filename) {
       const char *err = "{\"ok\":false,\"message\":\"Missing filename\"}";
       resp = MHD_create_response_from_buffer(strlen(err), (void *)err, MHD_RESPMEM_MUST_COPY);
@@ -945,8 +1023,16 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     }
 
     char msg_buf[1024] = "";
-    const char *detail = (repo_url && repo_url[0]) ? repo_url : REPOSITORY_SOURCE_URL;
-    int rc = payload_mgr_repository_install_download(filename, detail, msg_buf, sizeof(msg_buf));
+    int rc;
+    /* Use multi-source install if source_id is provided */
+    if (source_id && source_id[0]) {
+      rc = payload_mgr_multi_repository_install(filename, source_id,
+                                                repo_url ? repo_url : "",
+                                                msg_buf, sizeof(msg_buf));
+    } else {
+      const char *detail = (repo_url && repo_url[0]) ? repo_url : REPOSITORY_SOURCE_URL;
+      rc = payload_mgr_repository_install_download(filename, detail, msg_buf, sizeof(msg_buf));
+    }
     if (msg_buf[0] == '\0') {
       snprintf(msg_buf, sizeof(msg_buf), rc == 0 ? "Installed" : "Install failed");
     }
@@ -958,6 +1044,62 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
     MHD_add_response_header(resp, "Content-Type", "application/json");
     add_cors_headers(resp);
     return MHD_queue_response(conn, rc == 0 ? MHD_HTTP_OK : MHD_HTTP_INTERNAL_SERVER_ERROR, resp);
+  } else if (strcmp(url, ROUTE_SOURCES_LIST) == 0) {
+    char *resp_buf;
+    struct MHD_Response *oom_resp = alloc_response_buffer(&resp_buf);
+    if (oom_resp)
+      return MHD_queue_response(conn, MHD_HTTP_INTERNAL_SERVER_ERROR, oom_resp);
+    payload_mgr_sources_list_json(resp_buf, RESPONSE_BUFFER_SIZE);
+    resp = MHD_create_response_from_buffer(strlen(resp_buf), (void *)resp_buf, MHD_RESPMEM_MUST_FREE);
+    MHD_add_response_header(resp, "Content-Type", "application/json");
+  } else if (strcmp(url, ROUTE_SOURCES_ADD) == 0) {
+    const char *src_url = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "url");
+    if (!src_url || !src_url[0]) {
+      const char *err = "{\"ok\":false,\"message\":\"Missing url parameter\"}";
+      resp = MHD_create_response_from_buffer(strlen(err), (void *)err, MHD_RESPMEM_MUST_COPY);
+      MHD_add_response_header(resp, "Content-Type", "application/json");
+      add_cors_headers(resp);
+      return MHD_queue_response(conn, MHD_HTTP_BAD_REQUEST, resp);
+    }
+    char msg_buf_src[512] = "";
+    int rc_src = payload_mgr_sources_add(src_url, msg_buf_src, sizeof(msg_buf_src));
+    char json_resp_src[1024];
+    if (rc_src == 0) {
+      char name_escaped[512];
+      pldmgr_json_escape(msg_buf_src, name_escaped, sizeof(name_escaped));
+      snprintf(json_resp_src, sizeof(json_resp_src),
+               "{\"ok\":true,\"name\":\"%s\"}", name_escaped);
+    } else {
+      char msg_escaped[512];
+      pldmgr_json_escape(msg_buf_src, msg_escaped, sizeof(msg_escaped));
+      snprintf(json_resp_src, sizeof(json_resp_src),
+               "{\"ok\":false,\"message\":\"%s\"}", msg_escaped);
+    }
+    resp = MHD_create_response_from_buffer(strlen(json_resp_src), (void *)json_resp_src, MHD_RESPMEM_MUST_COPY);
+    MHD_add_response_header(resp, "Content-Type", "application/json");
+    add_cors_headers(resp);
+    return MHD_queue_response(conn, rc_src == 0 ? MHD_HTTP_OK : MHD_HTTP_BAD_REQUEST, resp);
+  } else if (strcmp(url, ROUTE_SOURCES_REMOVE) == 0) {
+    const char *idx_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "index");
+    if (!idx_str) {
+      const char *err = "{\"ok\":false,\"message\":\"Missing index parameter\"}";
+      resp = MHD_create_response_from_buffer(strlen(err), (void *)err, MHD_RESPMEM_MUST_COPY);
+      MHD_add_response_header(resp, "Content-Type", "application/json");
+      add_cors_headers(resp);
+      return MHD_queue_response(conn, MHD_HTTP_BAD_REQUEST, resp);
+    }
+    int idx = atoi(idx_str);
+    char msg_rm[256] = "";
+    int rc_rm = payload_mgr_sources_remove(idx, msg_rm, sizeof(msg_rm));
+    char json_rm[512];
+    char msg_rm_e[256];
+    pldmgr_json_escape(msg_rm, msg_rm_e, sizeof(msg_rm_e));
+    snprintf(json_rm, sizeof(json_rm), "{\"ok\":%s,\"message\":\"%s\"}",
+             rc_rm == 0 ? "true" : "false", msg_rm_e);
+    resp = MHD_create_response_from_buffer(strlen(json_rm), (void *)json_rm, MHD_RESPMEM_MUST_COPY);
+    MHD_add_response_header(resp, "Content-Type", "application/json");
+    add_cors_headers(resp);
+    return MHD_queue_response(conn, rc_rm == 0 ? MHD_HTTP_OK : MHD_HTTP_BAD_REQUEST, resp);
   } else if (strncmp(url, ROUTE_LOAD_PAYLOAD, strlen(ROUTE_LOAD_PAYLOAD)) ==
              0) {
     const char *path = url + strlen(ROUTE_LOAD_PAYLOAD);
@@ -1080,10 +1222,10 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
       fclose(f);
     }
 
-    int config_enabled, config_browser, config_delay, config_kill, config_usb, config_install;
+    int config_enabled, config_browser, config_delay, config_kill, config_usb, config_install, config_multi;
     long config_repo;
     read_next_config_values(&config_enabled, &config_repo, &config_browser,
-                            &config_delay, &config_kill, &config_usb, &config_install);
+                            &config_delay, &config_kill, &config_usb, &config_install, &config_multi);
 
     char current_escaped[256];
     char list_escaped[8192];
@@ -1124,10 +1266,10 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
                                            MHD_RESPMEM_MUST_COPY);
     MHD_add_response_header(resp, "Content-Type", "application/json");
   } else if (strcmp(url, ROUTE_GET_CONFIG) == 0) {
-    int enabled = 0, browser_open = 1, auto_delay = 5, kill_disc = 1, scan_usb = 0, auto_install = 1;
+    int enabled = 0, browser_open = 1, auto_delay = 5, kill_disc = 1, scan_usb = 0, auto_install = 1, multi_src = 0;
     long last_repo_update = 0;
     read_next_config_values(&enabled, &last_repo_update, &browser_open,
-                            &auto_delay, &kill_disc, &scan_usb, &auto_install);
+                            &auto_delay, &kill_disc, &scan_usb, &auto_install, &multi_src);
 
     /* Get list */
     char list_buf[4096] = {0};
@@ -1157,11 +1299,13 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn,
                "{\"AUTOLOAD_ENABLED\":%s,\"AUTOLOAD_LIST\":\"%s\",\"LAST_"
                "REPOSITORY_UPDATE\":%ld,"
                "\"AUTO_BROWSER_OPEN\":%s,\"AUTOLOAD_DELAY\":%d,\"KILL_DISC_"
-               "PLAYER_ON_STARTUP\":%s,\"SCAN_USB_PAYLOADS\":%s,\"AUTO_INSTALL_APP\":%s}",
+               "PLAYER_ON_STARTUP\":%s,\"SCAN_USB_PAYLOADS\":%s,\"AUTO_INSTALL_APP\":%s,"
+               "\"MULTI_SOURCES_ENABLED\":%s}",
                enabled ? "true" : "false", list_escaped, last_repo_update,
                browser_open ? "true" : "false", auto_delay,
                kill_disc ? "true" : "false", scan_usb ? "true" : "false",
-               auto_install ? "true" : "false");
+               auto_install ? "true" : "false",
+               multi_src ? "true" : "false");
       resp = MHD_create_response_from_buffer(strlen(resp_buf),
                                              (void *)resp_buf,
                                              MHD_RESPMEM_MUST_FREE);
@@ -1241,9 +1385,9 @@ int main(int argc, char *argv[]) {
   }
 
   /* Start Autoload Sequence (if config exists) */
-  int ex_en, ex_br = 1, ex_del = 5, ex_kill = 1, ex_usb = 0, ex_install = 1;
+  int ex_en, ex_br = 1, ex_del = 5, ex_kill = 1, ex_usb = 0, ex_install = 1, ex_multi = 0;
   long ex_repo = 0;
-  read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del, &ex_kill, &ex_usb, &ex_install);
+  read_next_config_values(&ex_en, &ex_repo, &ex_br, &ex_del, &ex_kill, &ex_usb, &ex_install, &ex_multi);
 
   /* Install app if requested */
   if (ex_install) {

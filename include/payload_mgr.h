@@ -26,4 +26,14 @@ int payload_mgr_usb_move(const char *usb_path, int overwrite, char *out_json, si
 
 int payload_mgr_check_self_update(char *out_path, size_t out_size);
 
+/* Sources Management */
+int payload_mgr_sources_list_json(char *buf, size_t size);
+int payload_mgr_sources_save(const char *json, size_t len);
+int payload_mgr_sources_add(const char *url, char *msg_buf, size_t msg_size);
+int payload_mgr_sources_remove(int index, char *msg_buf, size_t msg_size);
+
+/* Multi-Source Repository */
+size_t payload_mgr_multi_repository_list_json(char *buf, size_t size, int force_refresh);
+int payload_mgr_multi_repository_install(const char *filename, const char *source_id, const char *repo_url, char *msg, size_t msg_size);
+
 #endif

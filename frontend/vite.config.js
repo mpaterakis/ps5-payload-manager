@@ -38,7 +38,14 @@ export default defineConfig({
         target: 'http://127.0.0.1:8081',
         changeOrigin: true,
         sse: true
-      }
+      },
+      '/sources_list': { target: 'http://127.0.0.1:8081', changeOrigin: true },
+      '/sources_set': { target: 'http://127.0.0.1:8081', changeOrigin: true },
+      '/sources_add': { target: 'http://127.0.0.1:8081', changeOrigin: true },
+      '/sources_remove': { target: 'http://127.0.0.1:8081', changeOrigin: true },
+      '/repository_payloads': { target: 'http://127.0.0.1:8081', changeOrigin: true },
+      '/repository_refresh': { target: 'http://127.0.0.1:8081', changeOrigin: true },
+      '/repository_install': { target: 'http://127.0.0.1:8081', changeOrigin: true }
     }
   }
 })

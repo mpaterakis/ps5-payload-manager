@@ -26,6 +26,10 @@
 #define ROUTE_REPO_INSTALL "/repository_install"
 #define ROUTE_REPO_PUSH "/repository_push"
 #define ROUTE_REPO_INSTALL_PUSH "/repository_install_push"
+#define ROUTE_SOURCES_LIST "/sources_list"
+#define ROUTE_SOURCES_SET "/sources_set"
+#define ROUTE_SOURCES_ADD "/sources_add"
+#define ROUTE_SOURCES_REMOVE "/sources_remove"
 #define ROUTE_USB_MOVE_CHECK "/usb_move_check"
 #define ROUTE_USB_MOVE_PERFORM "/usb_move_perform"
 #define ROUTE_CACHE_MANIFEST "/cache.appcache"
@@ -50,6 +54,8 @@ int pldmgr_read_config_bool(const char *key, int default_val);
 
 /* Paths */
 #define BASE_DATA_DIR "/data/pldmgr"
+#define SOURCES_CONFIG_PATH "/data/pldmgr/sources.json"
+#define MAX_SOURCES 9
 
 /* Scan Locations (Internal + 8 USB ports) */
 static const char *SCAN_DIRS[] = {

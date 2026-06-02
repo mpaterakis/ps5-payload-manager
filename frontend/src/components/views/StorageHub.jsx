@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { CloudDownload, Upload, Package, Database, RefreshCw, Trash2, Loader2, AlertTriangle, HardDrive, Usb } from 'lucide-react'
+import { CloudDownload, Upload, Package, Database, RefreshCw, Trash2, Loader2, AlertTriangle, HardDrive, Usb, ChevronDown, Globe } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { cn, isPS5, isSystemPayload } from '../../utils/helpers'
 import PayloadName from '../ui/PayloadName'
 
-const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, config, ip, scrollTarget, onClearScrollTarget }) => {
-  const [remotePayloads, setRemotePayloads] = useState([])
-  const [repoUrl, setRepoUrl] = useState('')
+const StorageHub = ({ payloads, payloadMeta, onInstall, onDelete, onUpload, onImportFromUsb, config, ip, scrollTarget, onClearScrollTarget }) => {
+  const multiSources = config?.MULTI_SOURCES_ENABLED === true
+
+  const [repoData, setRepoData] = useState(null)   // null = not loaded yet
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
-  const [lastUpdate, setLastUpdate] = useState(0)
+  const [expandedSource, setExpandedSource] = useState(null) // id of expanded catalog
 
   const fetchRemote = async (force = false) => {
     setLoading(true)
@@ -19,17 +20,18 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
       const res = await fetch(endpoint)
       if (!res.ok) throw new Error()
       const data = await res.json()
+      setRepoData(data)
 
-      if (!Array.isArray(data?.payloads)) throw new Error()
-      setRemotePayloads(data.payloads)
-      setRepoUrl(data.repo_url || '')
-      const lastUpd = Number(data.last_update || 0)
-      setLastUpdate(lastUpd)
+      // For multi-source: auto-expand first source with payloads
+      if (data?.sources?.length > 0 && expandedSource === null) {
+        const first = data.sources.find(s => s.payloads?.length > 0)
+        if (first) setExpandedSource(first.id)
+      }
 
-      // Auto-update if older than 24h
-      if (!force) {
+      // Legacy single-source: auto-refresh if older than 24h
+      if (!force && data?.last_update) {
         const now = Math.floor(Date.now() / 1000)
-        if (now - lastUpd > 24 * 60 * 60) {
+        if (now - Number(data.last_update) > 24 * 60 * 60) {
           await fetchRemote(true)
           return
         }
@@ -41,17 +43,13 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
     }
   }
 
-  useEffect(() => {
-    fetchRemote()
-  }, [])
+  useEffect(() => { fetchRemote() }, [])
 
   useEffect(() => {
     if (scrollTarget) {
       const timer = setTimeout(() => {
         const element = document.getElementById(scrollTarget);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
-        }
+        if (element) element.scrollIntoView({ behavior: 'smooth' });
         if (onClearScrollTarget) onClearScrollTarget();
       }, 300);
       return () => clearTimeout(timer);
@@ -69,23 +67,44 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
     return clean.replace(/[_-]ps[45]$/i, '');
   }
 
-  const remoteStatus = useMemo(() => {
-    if (!Array.isArray(remotePayloads)) return []
-    return remotePayloads.map(p => {
+  /* ---- Derive remote status for a flat list of payloads ---- */
+  const enrichPayloads = (list) =>
+    list.map(p => {
       const isInstalled = p.filename ? localFilenames.includes(p.filename) : false
       const baseName = getBaseName(p.filename)
       const installedVersion = localFilenames.find(f => getBaseName(f) === baseName)
       const isUpdate = !isInstalled && !!installedVersion
-
       return { ...p, isInstalled, isUpdate, installedFilename: installedVersion }
     }).sort((a, b) => {
       if (a.isUpdate && !b.isUpdate) return -1
       if (!a.isUpdate && b.isUpdate) return 1
       return 0
     })
-  }, [remotePayloads, localFilenames])
 
-  const cloudItems = remoteStatus.filter(p => !p.isInstalled || p.isUpdate);
+  /* ---- Source-grouped data (multi-source mode) ---- */
+  const enrichedSources = useMemo(() => {
+    if (!repoData?.sources) return []
+    return repoData.sources.map(src => ({
+      ...src,
+      payloads: enrichPayloads(src.payloads || [])
+    }))
+  }, [repoData, localFilenames])
+
+  /* ---- Flat list (legacy single-source mode) ---- */
+  const remotePayloads = useMemo(() => {
+    if (!repoData?.payloads) return []
+    return enrichPayloads(repoData.payloads)
+  }, [repoData, localFilenames])
+
+  const legacyRepoUrl = repoData?.repo_url || ''
+  const legacyLastUpdate = Number(repoData?.last_update || 0)
+
+  /* ---- Source badge helper: look up source name from metadata ---- */
+  const getSourceBadge = (fileName) => {
+    if (!multiSources || !payloadMeta) return null
+    const meta = payloadMeta[fileName]
+    return meta?.source_name || meta?.install_source_detail || null
+  }
 
   return (
     <div className="space-y-12">
@@ -122,12 +141,17 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
               <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm italic">Library Empty</p>
             </div>
           ) : (
-            internalPayloads.map((path, i) => {
+            internalPayloads.map((path) => {
               const fileName = path.split('/').pop()
-              const remoteMatch = remoteStatus.find(rp => rp.filename === fileName || rp.installedFilename === fileName)
+              const sourceBadge = getSourceBadge(fileName)
+              // Find update in all sources (multi or legacy)
+              const allRemote = multiSources
+                ? enrichedSources.flatMap(s => s.payloads)
+                : remotePayloads
+              const remoteMatch = allRemote.find(rp => rp.filename === fileName || rp.installedFilename === fileName)
               return (
                 <div key={path} className={cn(
-                  "group flex justify-between p-4 md:p-6 glass-card rounded-ps-2xl border-white/10 hover:border-ps-blue/30 gap-4",
+                  "group flex justify-between p-4 md:p-6 glass-card rounded-ps-2xl border-white/10 hover:border-ps-blue/30 gap-4 relative overflow-hidden",
                   isPS5 ? "flex-row items-center" : "flex-col md:flex-row md:items-center"
                 )}>
                   <div className="flex items-center space-x-4 md:space-x-6 min-w-0">
@@ -136,12 +160,21 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
                     </div>
                     <div className="min-w-0 flex-1">
                       <PayloadName path={fileName} className="text-xl md:text-2xl text-white" stacked />
+                  {/* Source badge — floats in bottom-right, doesn't expand the row */}
+                  {sourceBadge && (
+                    <div className="absolute bottom-2 right-3 flex items-center gap-1 z-10 pointer-events-none">
+                      <Globe className="w-3 h-3 text-zinc-500 shrink-0" />
+                      <span className="text-[11px] text-zinc-400 font-medium truncate max-w-[160px] select-none">
+                        {sourceBadge}
+                      </span>
+                    </div>
+                  )}
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 md:space-x-4 ml-auto md:ml-0">
                     {remoteMatch?.isUpdate && (
                       <button
-                        onClick={() => onInstall(remoteMatch, repoUrl)}
+                        onClick={() => onInstall(remoteMatch, remoteMatch.source_id, legacyRepoUrl)}
                         className="flex items-center space-x-2 md:space-x-3 px-4 md:px-6 py-2 md:py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs md:text-sm transition-all"
                       >
                         <RefreshCw className="w-4 h-4 md:w-5 md:h-5" />
@@ -174,13 +207,8 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
             <RefreshCw className={cn("w-5 h-5", loading && "animate-spin")} />
           </button>
         </div>
-        {lastUpdate > 0 && (
-          <p className="px-2 text-xs uppercase tracking-widest text-zinc-500">
-            Last Sync: {new Date(lastUpdate * 1000).toLocaleString()}
-          </p>
-        )}
 
-        {loading && remotePayloads.length === 0 ? (
+        {loading && !repoData ? (
           <div className="py-24 glass-panel rounded-ps-3xl border-white/5 flex flex-col items-center justify-center space-y-6">
             <Loader2 className="w-16 h-16 text-ps-blue animate-spin" />
             <p className="label-caps">Syncing with Repository...</p>
@@ -194,39 +222,131 @@ const StorageHub = ({ payloads, onInstall, onDelete, onUpload, onImportFromUsb, 
             </div>
             <button onClick={() => fetchRemote(true)} className="px-8 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl font-bold uppercase text-xs transition-all">Retry Connection</button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {cloudItems.length === 0 ? (
-              <div className="py-20 border-2 border-dashed border-white/5 rounded-ps-3xl flex flex-col items-center justify-center space-y-4 bg-white/[0.01]">
-                <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm italic">Repository Up to Date</p>
-              </div>
-            ) : (
-              cloudItems.map((p, i) => (
-                <div key={p.filename} className={cn(
-                  "glass-card p-6 md:p-8 rounded-ps-3xl flex flex-col md:flex-row justify-between gap-4 md:gap-8 border-white/10 hover:border-ps-blue/20 transition-all bg-white/[0.01]",
-                  isPS5 ? "flex-row items-center" : "items-start md:items-center"
-                )}>
-                  <div className="space-y-2 md:space-y-3 min-w-0">
-                    <div className="flex items-center space-x-4">
-                      <PayloadName path={p.filename} className="text-xl md:text-2xl text-white" stacked />
-                    </div>
-                    <p className="text-sm md:text-lg text-zinc-400 font-medium max-w-3xl leading-relaxed">{p.description}</p>
-                  </div>
-
+        ) : multiSources && enrichedSources.length > 0 ? (
+          /* ===== MULTI-SOURCE: accordion catalogs ===== */
+          <div className="space-y-4">
+            {enrichedSources.map(src => {
+              const availablePayloads = src.payloads.filter(p => !p.isInstalled || p.isUpdate)
+              const isExpanded = expandedSource === src.id
+              return (
+                <div key={src.id} className="glass-card rounded-ps-3xl border border-white/10 overflow-hidden">
+                  {/* Catalog header */}
                   <button
-                    onClick={() => onInstall(p, repoUrl)}
-                    className={cn(
-                      "flex items-center justify-center space-x-3 md:space-x-4 px-6 md:px-8 py-3 md:py-5 rounded-2xl font-bold text-lg md:text-xl transition-all shrink-0 transform active:scale-95",
-                      isPS5 ? "w-auto px-12" : "w-full md:w-auto",
-                      p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
-                    )}
+                    onClick={() => setExpandedSource(isExpanded ? null : src.id)}
+                    className="w-full flex items-center justify-between p-6 md:p-8 hover:bg-white/5 transition-colors"
                   >
-                    <CloudDownload className="w-5 h-5 md:w-7 md:h-7" />
-                    <span>{p.isUpdate ? "Update" : "Install"}</span>
+                    <div className="flex items-center space-x-4">
+                      <div className="p-2.5 bg-ps-blue/10 rounded-xl">
+                        <Globe className="w-5 h-5 text-ps-blue" />
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold text-white text-lg">{src.name}</p>
+                        {src.error && (
+                          <p className="text-xs text-red-400 flex items-center space-x-1 mt-0.5">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>Fetch failed</span>
+                          </p>
+                        )}
+                        {!src.error && src.last_update > 0 && (
+                          <p className="text-xs text-zinc-600 mt-0.5">
+                            Updated {new Date(src.last_update * 1000).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="px-3 py-1 rounded-full bg-white/5 text-zinc-500 text-xs font-bold">
+                        {availablePayloads.length} available
+                      </span>
+                      <ChevronDown className={cn("w-5 h-5 text-zinc-500 transition-transform", isExpanded && "rotate-180")} />
+                    </div>
                   </button>
+
+                  {/* Catalog payload list */}
+                  {isExpanded && (
+                    <div className="border-t border-white/5 divide-y divide-white/5">
+                      {availablePayloads.length === 0 ? (
+                        <div className="py-12 flex flex-col items-center justify-center space-y-3 text-zinc-600">
+                          <p className="text-sm font-bold uppercase tracking-widest italic">All payloads installed</p>
+                        </div>
+                      ) : (
+                        availablePayloads.map(p => (
+                          <div
+                            key={p.filename}
+                            className={cn(
+                              "flex flex-col md:flex-row justify-between gap-4 md:gap-8 p-6 md:p-8 hover:bg-white/[0.02] transition-colors",
+                              isPS5 ? "flex-row items-center" : "items-start md:items-center"
+                            )}
+                          >
+                            <div className="space-y-2 min-w-0">
+                              <PayloadName path={p.filename} className="text-xl md:text-2xl text-white" stacked />
+                              {p.description && (
+                                <p className="text-sm md:text-base text-zinc-400 font-medium leading-relaxed">{p.description}</p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => onInstall(p, p.source_id, src.url)}
+                              className={cn(
+                                "flex items-center justify-center space-x-3 px-6 md:px-8 py-3 md:py-5 rounded-2xl font-bold text-lg transition-all shrink-0 transform active:scale-95",
+                                isPS5 ? "w-auto px-12" : "w-full md:w-auto",
+                                p.isUpdate
+                                  ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                                  : "bg-ps-blue hover:bg-ps-blue/80 text-white"
+                              )}
+                            >
+                              <CloudDownload className="w-5 h-5 md:w-6 md:h-6" />
+                              <span>{p.isUpdate ? "Update" : "Install"}</span>
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
-              ))
+              )
+            })}
+          </div>
+        ) : (
+          /* ===== SINGLE-SOURCE: flat list (legacy / multi-source disabled) ===== */
+          <div className="grid grid-cols-1 gap-4">
+            {legacyLastUpdate > 0 && (
+              <p className="px-2 text-xs uppercase tracking-widest text-zinc-500">
+                Last Sync: {new Date(legacyLastUpdate * 1000).toLocaleString()}
+              </p>
             )}
+            {(() => {
+              const cloudItems = remotePayloads.filter(p => !p.isInstalled || p.isUpdate)
+              return cloudItems.length === 0 ? (
+                <div className="py-20 border-2 border-dashed border-white/5 rounded-ps-3xl flex flex-col items-center justify-center space-y-4 bg-white/[0.01]">
+                  <p className="text-zinc-500 font-bold uppercase tracking-widest text-sm italic">Repository Up to Date</p>
+                </div>
+              ) : (
+                cloudItems.map(p => (
+                  <div key={p.filename} className={cn(
+                    "glass-card p-6 md:p-8 rounded-ps-3xl flex flex-col md:flex-row justify-between gap-4 md:gap-8 border-white/10 hover:border-ps-blue/20 transition-all bg-white/[0.01]",
+                    isPS5 ? "flex-row items-center" : "items-start md:items-center"
+                  )}>
+                    <div className="space-y-2 md:space-y-3 min-w-0">
+                      <div className="flex items-center space-x-4">
+                        <PayloadName path={p.filename} className="text-xl md:text-2xl text-white" stacked />
+                      </div>
+                      <p className="text-sm md:text-lg text-zinc-400 font-medium max-w-3xl leading-relaxed">{p.description}</p>
+                    </div>
+                    <button
+                      onClick={() => onInstall(p, null, legacyRepoUrl)}
+                      className={cn(
+                        "flex items-center justify-center space-x-3 md:space-x-4 px-6 md:px-8 py-3 md:py-5 rounded-2xl font-bold text-lg md:text-xl transition-all shrink-0 transform active:scale-95",
+                        isPS5 ? "w-auto px-12" : "w-full md:w-auto",
+                        p.isUpdate ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-ps-blue hover:bg-ps-blue/80 text-white"
+                      )}
+                    >
+                      <CloudDownload className="w-5 h-5 md:w-7 md:h-7" />
+                      <span>{p.isUpdate ? "Update" : "Install"}</span>
+                    </button>
+                  </div>
+                ))
+              )
+            })()}
           </div>
         )}
       </section>

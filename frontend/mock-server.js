@@ -37,7 +37,30 @@ const remoteRepository = [
     checksum: "54df47a48d9c5ee4338ef70ba66093908a4f2845e53468bdd7c080b65d7488c1"
   }
 ];
+
+const communityRepository = [
+  {
+    name: "PS5 Hen Test",
+    filename: "ps5_hen_test_v1.0.elf",
+    url: "https://example.com/payloads/ps5_hen_test_v1.0.elf",
+    description: "Community hen test payload — no checksum",
+    version: "v1.0"
+  },
+  {
+    name: "Debug Tool",
+    filename: "debug_tool_v2.1.elf",
+    url: "https://example.com/payloads/debug_tool_v2.1.elf",
+    description: "Debug utility from community repo",
+    version: "v2.1"
+  }
+];
+
 let lastRepositoryUpdate = Math.floor(Date.now() / 1000);
+
+let mockSources = [
+  { id: 'default', name: 'Official Repository', url: 'https://itsplk.github.io/ps5-payloads-mirror/payloads.json', removable: false },
+  { id: 'source_community', name: 'Community Payloads', url: 'https://example.com/community-payloads.json', removable: true }
+];
 
 let autoloadStatus = {
   remaining: 10,
@@ -90,7 +113,15 @@ app.get('/list_payloads', (req, res) => {
       "/data/pldmgr/etaHEN_1.8.elf",
       "/data/pldmgr/kstuff.elf",
       "/mnt/usb0/pldmgr/linux_loader.elf"
-    ]
+    ],
+    meta: {
+      // payloads with no entry here = official / no badge shown
+      "kstuff.elf": {
+        source_name: "Community Payloads",
+        install_source: "repository",
+        install_source_detail: "https://example.com/community-payloads.json"
+      }
+    }
   });
 });
 
@@ -103,15 +134,30 @@ app.get('/get_config', (req, res) => {
     AUTOLOAD_ENABLED: true,
     AUTOLOAD_LIST: "goldhen_v2.4b17.elf,etaHEN_1.8.elf",
     LAST_REPOSITORY_UPDATE: lastRepositoryUpdate,
-    AUTO_INSTALL_APP: true
+    AUTO_INSTALL_APP: true,
+    MULTI_SOURCES_ENABLED: true
   });
 });
 
 app.get('/repository_payloads', (req, res) => {
+  // Return source-grouped format (multi-source mode always on in mock)
   res.json({
-    payloads: remoteRepository,
-    last_update: lastRepositoryUpdate,
-    cache_status: 'ok'
+    sources: [
+      {
+        id: 'default',
+        name: 'Official Repository',
+        last_update: lastRepositoryUpdate,
+        error: false,
+        payloads: remoteRepository.map(p => ({ ...p, source_id: 'default', source_name: 'Official Repository' }))
+      },
+      {
+        id: 'source_community',
+        name: 'Community Payloads',
+        last_update: lastRepositoryUpdate,
+        error: false,
+        payloads: communityRepository.map(p => ({ ...p, source_id: 'source_community', source_name: 'Community Payloads' }))
+      }
+    ]
   });
 });
 
@@ -119,10 +165,57 @@ app.get('/repository_refresh', (req, res) => {
   lastRepositoryUpdate = Math.floor(Date.now() / 1000);
   logs.push(`[PLDMGR] Repository manually refreshed`);
   res.json({
-    payloads: remoteRepository,
-    last_update: lastRepositoryUpdate,
-    cache_status: 'ok'
+    sources: [
+      {
+        id: 'default',
+        name: 'Official Repository',
+        last_update: lastRepositoryUpdate,
+        error: false,
+        payloads: remoteRepository.map(p => ({ ...p, source_id: 'default', source_name: 'Official Repository' }))
+      },
+      {
+        id: 'source_community',
+        name: 'Community Payloads',
+        last_update: lastRepositoryUpdate,
+        error: false,
+        payloads: communityRepository.map(p => ({ ...p, source_id: 'source_community', source_name: 'Community Payloads' }))
+      }
+    ]
   });
+});
+
+app.get('/sources_list', (req, res) => {
+  res.json({ sources: mockSources });
+});
+
+app.post('/sources_set', (req, res) => {
+  const { sources } = req.body;
+  if (Array.isArray(sources)) {
+    mockSources = sources;
+    logs.push(`[PLDMGR] Sources updated: ${sources.length} sources`);
+  }
+  res.send('OK');
+});
+
+app.get('/sources_add', (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ ok: false, message: 'Missing url' });
+  // Mock: always succeed with a fake source name derived from the URL
+  const fakeName = `Community Source (${new URL(url).hostname})`;
+  const newSource = { id: `source_${Date.now()}`, name: fakeName, url, removable: true };
+  mockSources.push(newSource);
+  logs.push(`[PLDMGR] Source added: ${fakeName}`);
+  res.json({ ok: true, name: fakeName });
+});
+
+app.get('/sources_remove', (req, res) => {
+  const idx = parseInt(req.query.index);
+  if (isNaN(idx) || idx <= 0 || idx >= mockSources.length) {
+    return res.status(400).json({ ok: false, message: 'Invalid index or cannot remove default source' });
+  }
+  const removed = mockSources.splice(idx, 1);
+  logs.push(`[PLDMGR] Source removed: ${removed[0]?.name}`);
+  res.json({ ok: true, message: 'OK' });
 });
 
 app.get('/repository_install', (req, res) => {

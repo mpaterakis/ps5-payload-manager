@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
-import { Zap, Terminal, X, ChevronRight } from 'lucide-react'
+import { Zap, Terminal, X, ChevronRight, Globe } from 'lucide-react'
 import { cn } from '../../utils/helpers'
 
-const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs, showLogs, setShowLogs }) => {
+const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs, showLogs, setShowLogs, onNavigate }) => {
   const autoOpen = config.AUTO_BROWSER_OPEN !== false
   const autoInstall = config.AUTO_INSTALL_APP !== false
   const autoloadDelay = config.AUTOLOAD_DELAY || 5
+  const multiSources = config.MULTI_SOURCES_ENABLED === true
+
 
   const SettingRow = ({ title, description, children, icon: Icon }) => (
     <div className="flex items-center justify-between p-8 bg-white/[0.03] rounded-3xl border border-white/10 hover:border-ps-blue/30 transition-all group h-full">
@@ -138,6 +140,53 @@ const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs, showLogs, se
         </div>
       </section>
 
+      {/* Multi-Source */}
+      <section className="space-y-8">
+        <h3 className="label-caps !text-ps-blue !opacity-100 flex items-center space-x-4 text-xl tracking-[0.2em]">
+          <Globe className="w-6 h-6" />
+          <span>Payload Sources</span>
+        </h3>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <SettingRow
+            title="Multiple Payload Sources"
+            description="Enable third-party payload repositories. Payloads from multiple sources are grouped by catalog in the Manage tab."
+            icon={Globe}
+          >
+            <button
+              onClick={() => onSaveConfig({ MULTI_SOURCES_ENABLED: !multiSources })}
+              className={cn(
+                "w-20 h-10 rounded-full transition-all relative p-1.5",
+                multiSources ? "bg-ps-blue" : "bg-white/10"
+              )}
+            >
+              <div className={cn(
+                "w-7 h-7 bg-white rounded-full transition-all",
+                multiSources ? "translate-x-10" : "translate-x-0"
+              )} />
+            </button>
+          </SettingRow>
+
+          {multiSources && (
+            <button
+              onClick={() => onNavigate('sources')}
+              className="group flex items-center justify-between p-8 bg-white/[0.03] rounded-3xl border border-white/10 hover:border-ps-blue/50 hover:bg-ps-blue/5 transition-all text-left"
+            >
+              <div className="flex items-center space-x-6">
+                <div className="p-4 bg-white/5 rounded-2xl group-hover:bg-ps-blue/10 transition-colors">
+                  <Globe className="w-6 h-6 text-zinc-500 group-hover:text-ps-blue transition-colors" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-bold text-white uppercase text-lg tracking-tight">Manage Sources</p>
+                  <p className="text-sm text-zinc-500 max-w-md">Add, remove, or reorder your payload repositories.</p>
+                </div>
+              </div>
+              <ChevronRight className="w-8 h-8 text-zinc-700 group-hover:text-ps-blue group-hover:translate-x-2 transition-all" />
+            </button>
+          )}
+        </div>
+      </section>
+
       {/* Diagnostics */}
       <section className="space-y-8">
         <h3 className="label-caps !text-ps-blue !opacity-100 flex items-center space-x-4 text-xl tracking-[0.2em]">
@@ -161,6 +210,7 @@ const SettingsView = ({ config, onSaveConfig, isPS5, logs, setLogs, showLogs, se
           <ChevronRight className="w-8 h-8 text-zinc-700 group-hover:text-ps-blue group-hover:translate-x-2 transition-all" />
         </button>
       </section>
+
 
     </div>
   )

@@ -33,6 +33,7 @@ import DonateView from './components/views/DonateView'
 import AutoloadOverlay from './components/views/AutoloadOverlay'
 import MoveFromUsbView from './components/views/MoveFromUsbView'
 import LogViewer from './components/views/LogViewer'
+import ManageSourcesView from './components/views/ManageSourcesView'
 
 function App() {
   const [view, setView] = useState('dashboard')
@@ -68,6 +69,8 @@ function App() {
   const [moveFromUsbPath, setMoveFromUsbPath] = useState(null)
   const [storageScrollTarget, setStorageScrollTarget] = useState(null)
   const [showLogs, setShowLogs] = useState(false)
+  // Map filename -> metadata (source_name, etc.)
+  const [payloadMeta, setPayloadMeta] = useState({})
 
   useEffect(() => {
     if (!showLogs) return
@@ -81,6 +84,18 @@ function App() {
 
 
 
+
+  const showConfirm = (title, message, onConfirm) => {
+    setConfirmModal({
+      show: true,
+      title,
+      message,
+      onConfirm: () => {
+        setConfirmModal({ show: false })
+        onConfirm()
+      }
+    })
+  }
 
   const addToast = (message, type = 'success') => {
     const id = Date.now()
@@ -107,7 +122,6 @@ function App() {
     setLoadingPayloads(true)
     const data = await api('/list_payloads')
     if (data?.payloads) {
-      // Sort payloads: internal first, USB last
       const sorted = [...data.payloads].sort((a, b) => {
         const aIsUsb = a.startsWith('/mnt/usb')
         const bIsUsb = b.startsWith('/mnt/usb')
@@ -116,6 +130,10 @@ function App() {
         return a.localeCompare(b)
       })
       setPayloads(sorted)
+      // Build metadata map: filename -> meta object
+      if (data.meta && typeof data.meta === 'object') {
+        setPayloadMeta(data.meta)
+      }
       setLoadingPayloads(false)
     } else if (retryCount < 5) {
       setTimeout(() => refreshPayloads(retryCount + 1), 1000)
@@ -158,12 +176,10 @@ function App() {
   }
 
   const handleDelete = (fileName) => {
-    setConfirmModal({
-      show: true,
-      title: "Delete Payload",
-      message: `Are you sure you want to remove ${fileName}?`,
-      onConfirm: async () => {
-        setConfirmModal({ show: false })
+    showConfirm(
+      "Delete Payload",
+      `Are you sure you want to remove ${fileName}?`,
+      async () => {
         const res = await fetch(`/manage:delete?filename=${encodeURIComponent(fileName)}`)
         if (!res.ok) {
           addToast(`Delete failed (${res.status})`, 'error')
@@ -172,7 +188,7 @@ function App() {
         refreshPayloads()
         addToast(`${fileName} removed`)
       }
-    })
+    )
   }
 
   const handleUpload = async (e) => {
@@ -218,27 +234,28 @@ function App() {
     setTimeout(() => setDownloadModal({ show: false }), 800)
   }
 
-  const handleInstall = async (p, repoUrl) => {
+  const handleInstall = async (p, sourceId, repoUrl) => {
     if (p.isUpdate || p.isInstalled) {
       setConfirmModal({
         show: true,
         title: p.isUpdate ? "Update Payload" : "Reinstall Payload",
         message: `A version of ${p.name || p.filename} is already installed. Do you want to replace it with the repository version?`,
-        onConfirm: () => performInstall(p, repoUrl)
+        onConfirm: () => performInstall(p, sourceId, repoUrl)
       })
     } else {
-      performInstall(p, repoUrl)
+      performInstall(p, sourceId, repoUrl)
     }
   }
 
-  const performInstall = async (p, repoUrl) => {
+  const performInstall = async (p, sourceId, repoUrl) => {
     setConfirmModal({ show: false })
     setDownloadModal({ show: true, name: p.filename, progress: 10 })
     try {
       setDownloadModal(prev => ({ ...prev, progress: 30 }))
-      const res = await fetch(
-        `/repository_install?filename=${encodeURIComponent(p.filename)}&repo_url=${encodeURIComponent(repoUrl || '')}`
-      )
+      let url = `/repository_install?filename=${encodeURIComponent(p.filename)}`
+      if (sourceId) url += `&source_id=${encodeURIComponent(sourceId)}`
+      if (repoUrl) url += `&repo_url=${encodeURIComponent(repoUrl)}`
+      const res = await fetch(url)
       setDownloadModal(prev => ({ ...prev, progress: 80 }))
 
       const data = await res.json().catch(() => null)
@@ -496,12 +513,13 @@ function App() {
                     <button onClick={() => { setStorageScrollTarget('cloud-repository'); setView('storage'); }} className="px-8 py-3 bg-ps-blue text-white rounded-xl font-bold tracking-tight">Open Repository</button>
                   </div>
                 ) : (
-                  payloads.filter(p => !isSystemPayload(p)).map((p, i) => (
+                  payloads.filter(p => !isSystemPayload(p)).map((p) => (
                     <PayloadButton
                       key={p}
                       path={p}
                       onClick={() => loadPayload(p)}
                       isLoading={loading && activeLoadingName === p.split('/').pop().replace(/\.(elf|bin|lua)$/i, '').replace(/_/g, ' ')}
+                      sourceName={config.MULTI_SOURCES_ENABLED ? (payloadMeta[p.split('/').pop()]?.source_name || null) : null}
                     />
                   ))
                 )}
@@ -512,6 +530,7 @@ function App() {
           {view === 'storage' && (
             <StorageHub
               payloads={payloads}
+              payloadMeta={payloadMeta}
               onInstall={handleInstall}
               onDelete={handleDelete}
               onUpload={handleUpload}
@@ -558,8 +577,20 @@ function App() {
               setLogs={setLogs}
               showLogs={showLogs}
               setShowLogs={setShowLogs}
+              onNavigate={(v) => setView(v)}
             />
-          )}{view === 'donate' && <DonateView />}
+          )}
+
+          {view === 'sources' && (
+            <ManageSourcesView
+              onBack={() => setView('settings')}
+              ip={ip}
+              addToast={addToast}
+              showConfirm={showConfirm}
+            />
+          )}
+
+          {view === 'donate' && <DonateView />}
         </main>
       </div>
 

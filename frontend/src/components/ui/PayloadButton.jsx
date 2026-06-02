@@ -1,8 +1,8 @@
 import React from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Globe } from 'lucide-react'
 import PayloadName from './PayloadName'
 
-const PayloadButton = ({ path, onClick, isLoading }) => {
+const PayloadButton = ({ path, onClick, isLoading, sourceName }) => {
   return (
     <button
       onClick={onClick}
@@ -16,6 +16,14 @@ const PayloadButton = ({ path, onClick, isLoading }) => {
       {path.startsWith('/mnt/usb') && (
         <div className="mt-3 text-[10px] text-zinc-500 font-medium truncate opacity-60 group-hover:opacity-100 transition-opacity z-10 select-none">
           {path}
+        </div>
+      )}
+      {sourceName && !path.startsWith('/mnt/usb') && (
+        <div className="absolute bottom-2 right-3 flex items-center gap-1 z-10 pointer-events-none">
+          <Globe className="w-3 h-3 text-zinc-500 shrink-0" />
+          <span className="text-[11px] text-zinc-400 font-medium truncate max-w-[120px] select-none">
+            {sourceName}
+          </span>
         </div>
       )}
       {/* Glow effect */}
