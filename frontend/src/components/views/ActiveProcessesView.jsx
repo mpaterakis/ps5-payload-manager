@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Cpu, RefreshCw, XCircle, Search, AlertCircle, Activity, Loader2 } from 'lucide-react'
+import { Cpu, RefreshCw, XCircle, Search, AlertCircle, Activity, Loader2, Info } from 'lucide-react'
 import { cn, isPS5 } from '../../utils/helpers'
 
 const ActiveProcessesView = ({ ip, addToast, showConfirm }) => {
@@ -176,6 +176,13 @@ const ActiveProcessesView = ({ ip, addToast, showConfirm }) => {
             ))}
           </div>
         )}
+
+        <div className="bg-ps-blue/10 border border-ps-blue/20 rounded-2xl p-4 flex items-start space-x-3 mt-8">
+          <Info className="w-5 h-5 text-ps-blue shrink-0 mt-0.5" />
+          <p className="text-sm text-ps-blue/90 font-medium leading-relaxed">
+            <strong>Note:</strong> Some payloads that inject threads into system processes (like <code className="bg-black/20 px-1 rounded font-mono text-xs">SceShellCore</code>) will persist inside those processes even after their main process is killed.
+          </p>
+        </div>
       </section>
     </div>
   )
