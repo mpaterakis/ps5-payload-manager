@@ -518,6 +518,8 @@ enum MHD_Result http_on_request(void *cls, struct MHD_Connection *conn,
         const char *path = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "path");
         const char *overwrite_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "overwrite");
         int overwrite = (overwrite_str && strcmp(overwrite_str, "true") == 0) ? 1 : 0;
+        const char *keep_original_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "keep_original");
+        int keep_original = (keep_original_str && strcmp(keep_original_str, "true") == 0) ? 1 : 0;
         if (path) {
             char *resp_buf;
             struct MHD_Response *oom_resp = alloc_response_buffer(&resp_buf);
@@ -526,7 +528,7 @@ enum MHD_Result http_on_request(void *cls, struct MHD_Connection *conn,
                 MHD_destroy_response(oom_resp);
                 return ret;
             }
-            int rc = payload_mgr_usb_move(path, overwrite, resp_buf, RESPONSE_BUFFER_SIZE);
+            int rc = payload_mgr_usb_move(path, overwrite, keep_original, resp_buf, RESPONSE_BUFFER_SIZE);
             resp = MHD_create_response_from_buffer(strlen(resp_buf), (void *)resp_buf, MHD_RESPMEM_MUST_FREE);
             MHD_add_response_header(resp, "Content-Type", "application/json");
             add_cors_headers(resp);

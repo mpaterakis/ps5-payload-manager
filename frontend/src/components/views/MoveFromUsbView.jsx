@@ -31,23 +31,23 @@ const MoveFromUsbView = ({ path, onBack, onComplete, addToast }) => {
     }
   }
 
-  const performMove = async (overwrite = false) => {
+  const performMove = async (overwrite = false, keepOriginal = false) => {
     setStatus('processing')
     try {
-      const res = await fetch(`/usb_move_perform?path=${encodeURIComponent(path)}&overwrite=${overwrite}`)
+      const res = await fetch(`/usb_move_perform?path=${encodeURIComponent(path)}&overwrite=${overwrite}&keep_original=${keepOriginal}`)
       const data = await res.json()
       if (data.error) {
         setErrorMsg(data.error)
         setStatus('error')
       } else {
         setStatus('success')
-        addToast(data.warning || "Payload moved to internal memory")
+        addToast(data.warning || (keepOriginal ? "Payload copied to internal memory" : "Payload moved to internal memory"))
         setTimeout(() => {
           onComplete()
         }, 2000)
       }
     } catch (e) {
-      setErrorMsg("Move failed")
+      setErrorMsg("Operation failed")
       setStatus('error')
     }
   }
@@ -63,7 +63,7 @@ const MoveFromUsbView = ({ path, onBack, onComplete, addToast }) => {
         <h2 className="text-4xl font-extrabold text-white tracking-tight">
           Import <span className="text-ps-blue">to Internal</span>
         </h2>
-        <p className="text-zinc-500 max-w-2xl">This will move the selected payload from your USB drive to the PS5's internal data storage.</p>
+        <p className="text-zinc-500 max-w-2xl">Import the selected payload from your USB drive to the PS5's internal data storage.</p>
       </div>
 
       <div className="glass-card p-6 md:p-10 rounded-ps-3xl border-white/10 bg-white/[0.02] space-y-8 md:space-y-10">
@@ -119,13 +119,16 @@ const MoveFromUsbView = ({ path, onBack, onComplete, addToast }) => {
               <div className="space-y-2">
                 <p className="text-lg font-bold text-white">Previous version detected</p>
                 <p className="text-sm md:text-lg text-amber-400/80 leading-relaxed">
-                  A version of <strong>{details?.folder_name || details?.filename}</strong> already exists in internal storage. Moving this will replace the current installation. Do you want to proceed?
+                  A version of <strong>{details?.folder_name || details?.filename}</strong> already exists in internal storage. Importing this will replace the current installation. Do you want to proceed?
                 </p>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <button onClick={onBack} className="flex-1 py-4 md:py-6 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold uppercase transition-all">Cancel</button>
-              <button onClick={() => performMove(true)} className="flex-1 py-4 md:py-6 rounded-2xl bg-ps-blue hover:bg-ps-blue/80 text-white font-black uppercase italic text-lg md:text-xl transition-all shadow-xl shadow-ps-blue/20">Overwrite Existing</button>
+              <div className="flex flex-1 gap-2">
+                <button onClick={() => performMove(true, true)} className="flex-1 py-4 md:py-6 rounded-2xl bg-ps-blue/50 hover:bg-ps-blue/70 text-white font-black uppercase italic text-sm md:text-lg transition-all border border-ps-blue/30">Overwrite & Copy</button>
+                <button onClick={() => performMove(true, false)} className="flex-1 py-4 md:py-6 rounded-2xl bg-ps-blue hover:bg-ps-blue/80 text-white font-black uppercase italic text-sm md:text-lg transition-all shadow-xl shadow-ps-blue/20">Overwrite & Move</button>
+              </div>
             </div>
           </div>
         )}
@@ -137,11 +140,14 @@ const MoveFromUsbView = ({ path, onBack, onComplete, addToast }) => {
               <div className="space-y-2">
                 <p className="text-lg font-bold text-white">Ready to Import</p>
                 <p className="text-sm md:text-lg text-zinc-400 leading-relaxed">
-                  The payload will be copied to internal storage. Once the copy is verified, the original file will be removed from your USB drive.
+                  The payload will be imported to internal storage. You can either copy it and keep the original on the USB, or move it and delete the original.
                 </p>
               </div>
             </div>
-            <button onClick={() => performMove(false)} className="w-full py-4 md:py-6 rounded-2xl bg-ps-blue hover:bg-ps-blue/80 text-white font-black uppercase italic text-xl md:text-2xl transition-all shadow-2xl shadow-ps-blue/30">Move to Internal Storage</button>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button onClick={() => performMove(false, true)} className="flex-1 py-4 md:py-6 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-black uppercase italic text-lg md:text-xl transition-all border border-white/20">Copy to Internal</button>
+              <button onClick={() => performMove(false, false)} className="flex-1 py-4 md:py-6 rounded-2xl bg-ps-blue hover:bg-ps-blue/80 text-white font-black uppercase italic text-lg md:text-xl transition-all shadow-2xl shadow-ps-blue/30">Move to Internal</button>
+            </div>
           </div>
         )}
 
@@ -149,8 +155,8 @@ const MoveFromUsbView = ({ path, onBack, onComplete, addToast }) => {
           <div className="py-20 flex flex-col items-center justify-center space-y-8 text-center">
             <div className="ps5-robust-spinner" />
             <div className="space-y-2">
-              <p className="text-2xl font-black text-white uppercase italic tracking-tighter animate-pulse">Moving Payload...</p>
-              <p className="text-zinc-500">Copying, verifying SHA256, and cleaning up USB.</p>
+              <p className="text-2xl font-black text-white uppercase italic tracking-tighter animate-pulse">Importing Payload...</p>
+              <p className="text-zinc-500">Copying data and verifying integrity.</p>
             </div>
           </div>
         )}
@@ -162,7 +168,7 @@ const MoveFromUsbView = ({ path, onBack, onComplete, addToast }) => {
             </div>
             <div className="space-y-2">
               <p className="text-3xl font-black text-white uppercase italic tracking-tighter">Success!</p>
-              <p className="text-zinc-500">The payload has been safely moved to internal storage.</p>
+              <p className="text-zinc-500">The payload has been safely imported to internal storage.</p>
             </div>
           </div>
         )}

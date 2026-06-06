@@ -419,7 +419,7 @@ int payload_mgr_usb_check(const char *usb_path, char *out_json, size_t out_size)
     return 0;
 }
 
-int payload_mgr_usb_move(const char *usb_path, int overwrite, char *out_json,
+int payload_mgr_usb_move(const char *usb_path, int overwrite, int keep_original, char *out_json,
                          size_t out_size) {
     if (!is_allowed_usb_path(usb_path)) {
         snprintf(out_json, out_size, "{\"ok\":false,\"message\":\"Invalid USB path\"}");
@@ -467,10 +467,18 @@ int payload_mgr_usb_move(const char *usb_path, int overwrite, char *out_json,
     snprintf(details_path, sizeof(details_path), "%s/%s.json", payload_dir, filename);
     write_simple_payload_details_json(filename, details_path, "usb", usb_path);
 
-    /* Remove the original file to complete the move */
-    remove(usb_path);
-
-    pldmgr_log("[PLDMGR] USB payload moved: %s -> %s\n", usb_path, final_path);
-    snprintf(out_json, out_size, "{\"ok\":true,\"message\":\"Moved successfully\"}");
+    /* Remove the original file if not copying */
+    if (!keep_original) {
+        if (remove(usb_path) != 0) {
+            pldmgr_log("[PLDMGR] Warning: Failed to remove original file from USB: %s\n", usb_path);
+            snprintf(out_json, out_size, "{\"ok\":true,\"message\":\"Moved successfully\",\"warning\":\"Payload copied, but failed to delete original from USB.\"}");
+        } else {
+            pldmgr_log("[PLDMGR] USB payload moved: %s -> %s\n", usb_path, final_path);
+            snprintf(out_json, out_size, "{\"ok\":true,\"message\":\"Moved successfully\"}");
+        }
+    } else {
+        pldmgr_log("[PLDMGR] USB payload copied: %s -> %s\n", usb_path, final_path);
+        snprintf(out_json, out_size, "{\"ok\":true,\"message\":\"Copied successfully\"}");
+    }
     return 0;
 }

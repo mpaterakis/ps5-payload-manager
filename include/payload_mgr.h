@@ -20,7 +20,7 @@ int payload_mgr_write_metadata(const char *payload_path, const char *install_sou
 
 /* USB Import */
 int payload_mgr_usb_check(const char *usb_path, char *out_json, size_t out_size);
-int payload_mgr_usb_move(const char *usb_path, int overwrite, char *out_json,
+int payload_mgr_usb_move(const char *usb_path, int overwrite, int keep_original, char *out_json,
                          size_t out_size);
 
 /* Internal utility — exposed for use by repository.c and sources.c */
