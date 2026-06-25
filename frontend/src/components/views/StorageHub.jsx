@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { CloudDownload, Upload, Package, Database, RefreshCw, Trash2, Loader2, AlertTriangle, HardDrive, Usb, ChevronDown, Globe } from 'lucide-react'
+import { CloudDownload, Upload, Package, Database, RefreshCw, Trash2, Loader2, AlertTriangle, HardDrive, Usb, ChevronDown, Globe, Search } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { cn, isPS5, isIOS, parsePayloadName } from '../../utils/helpers'
 import PayloadName from '../ui/PayloadName'
@@ -76,6 +76,7 @@ const StorageHub = ({ payloads, payloadMeta, onInstall, onDelete, onUpload, onIm
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
   const [expandedSource, setExpandedSource] = useState(null) // id of expanded catalog
+  const [search, setSearch] = useState('')
 
   const fetchRemote = async (force = false) => {
     setLoading(true)
@@ -276,6 +277,17 @@ const StorageHub = ({ payloads, payloadMeta, onInstall, onDelete, onUpload, onIm
           </button>
         </div>
 
+        <div className="flex items-center bg-black/40 border border-white/10 rounded-2xl px-4 py-3 focus-within:border-ps-blue/50 transition-colors">
+          <Search className="w-5 h-5 text-zinc-500 mr-3" />
+          <input
+            type="text"
+            placeholder="Search payloads by name or description..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent border-none outline-none text-white w-full font-medium placeholder:text-zinc-600"
+          />
+        </div>
+
         {loading && !repoData ? (
           <div className="py-24 glass-panel rounded-ps-3xl border-white/5 flex flex-col items-center justify-center space-y-6">
             <Loader2 className="w-16 h-16 text-ps-blue animate-spin" />
@@ -294,9 +306,19 @@ const StorageHub = ({ payloads, payloadMeta, onInstall, onDelete, onUpload, onIm
           /* ===== REPOSITORY CATALOGS ===== */
           <div className="space-y-4">
             {enrichedSources.map(src => {
-              const availablePayloads = src.payloads.filter(p => !p.isInstalled || p.isUpdate)
-              // Auto-expand if there's only 1 source, otherwise respect state
-              const isExpanded = (enrichedSources.length === 1) || expandedSource === src.id
+              let availablePayloads = src.payloads.filter(p => !p.isInstalled || p.isUpdate)
+              
+              if (search.trim() !== '') {
+                const q = search.toLowerCase()
+                availablePayloads = availablePayloads.filter(p => 
+                  (p.name && p.name.toLowerCase().includes(q)) || 
+                  (p.filename && p.filename.toLowerCase().includes(q)) || 
+                  (p.description && p.description.toLowerCase().includes(q))
+                )
+              }
+              
+              // Auto-expand if there's only 1 source, otherwise respect state or active search
+              const isExpanded = (enrichedSources.length === 1) || expandedSource === src.id || search.trim() !== ''
 
               const groupedPayloads = availablePayloads.reduce((acc, p) => {
                 const cat = p.category || 'Uncategorized'
@@ -306,7 +328,7 @@ const StorageHub = ({ payloads, payloadMeta, onInstall, onDelete, onUpload, onIm
               }, {})
               
               const categories = Object.keys(groupedPayloads).sort()
-              const hasMultipleCategories = categories.length > 1
+              const hasMultipleCategories = categories.length > 1 && search.trim() === ''
 
               return (
                 <div key={src.id} className={cn(
