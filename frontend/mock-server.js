@@ -58,7 +58,7 @@ const communityRepository = [
 let lastRepositoryUpdate = Math.floor(Date.now() / 1000);
 
 let mockSources = [
-  { id: 'default', name: 'Official Repository', url: 'https://itsplk.github.io/ps5-payloads-mirror/payloads.json', removable: false },
+  { id: 'default', name: 'Official Repository', url: 'https://raw.githubusercontent.com/itsPLK/ps5-payloads-mirror/refs/heads/main/payloads.json', removable: false },
   { id: 'source_community', name: 'Community Payloads', url: 'https://example.com/community-payloads.json', removable: true }
 ];
 
